@@ -65,14 +65,19 @@
     "handling_docs_insurance_eur": 1200,
     "baseline_oil": 80.0,
     "lanes": {
-      "US": { "container_freight_eur": 2600, "base_bunker_eur": 600,  "tariff_rate": 0.10 },
-      "MX": { "container_freight_eur": 2900, "base_bunker_eur": 700,  "tariff_rate": 0.00 },
-      "CA": { "container_freight_eur": 2400, "base_bunker_eur": 550,  "tariff_rate": 0.00 },
-      "UK": { "container_freight_eur": 1800, "base_bunker_eur": 400,  "tariff_rate": 0.00 },
-      "BR": { "container_freight_eur": 3000, "base_bunker_eur": 750,  "tariff_rate": 0.14 },
-      "AU": { "container_freight_eur": 4200, "base_bunker_eur": 1100, "tariff_rate": 0.05 },
-      "CN": { "container_freight_eur": 4500, "base_bunker_eur": 1200, "tariff_rate": 0.08 }
+      "US": { "container_freight_eur": 2600, "base_bunker_eur": 600,  "tariff_rate": 0.10, "sell_price_eur": 62000 },
+      "MX": { "container_freight_eur": 2900, "base_bunker_eur": 700,  "tariff_rate": 0.00, "sell_price_eur": 56000 },
+      "CA": { "container_freight_eur": 2400, "base_bunker_eur": 550,  "tariff_rate": 0.00, "sell_price_eur": 57000 },
+      "UK": { "container_freight_eur": 1800, "base_bunker_eur": 400,  "tariff_rate": 0.00, "sell_price_eur": 57000 },
+      "BR": { "container_freight_eur": 3000, "base_bunker_eur": 750,  "tariff_rate": 0.14, "sell_price_eur": 61000 },
+      "AU": { "container_freight_eur": 4200, "base_bunker_eur": 1100, "tariff_rate": 0.05, "sell_price_eur": 66000 },
+      "CN": { "container_freight_eur": 4500, "base_bunker_eur": 1200, "tariff_rate": 0.08, "sell_price_eur": 67000 }
     }
+  },
+  "alerts": {
+    "_comment": "UI alert thresholds. cost_change_pct fires when a lane's landed cost moves more than X% vs yesterday's snapshot. band_change fires when risk crosses into a worse band. Alerts appear in-dashboard — no email/push needed.",
+    "cost_change_pct": 3.0,
+    "band_change": true
   },
   "risk_bands": [
     { "label": "Low",      "max": 30,  "color": "#22c55e" },

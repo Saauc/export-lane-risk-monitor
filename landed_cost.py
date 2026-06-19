@@ -111,6 +111,16 @@ def landed_cost_from_values(
     tariff = goods * lane["tariff_rate"]
     total = goods + freight + bunker + tariff + handling + feedstock + reroute
 
+    # Margin: sell_price_eur is the EUR-equivalent invoice price for this lane.
+    # Gross margin = revenue - total landed cost. Configured per lane so the
+    # commercial team can tune it independently of the cost model.
+    sell_price = lane.get("sell_price_eur")
+    if sell_price:
+        margin_eur = round(sell_price - total)
+        margin_pct = round(margin_eur / sell_price * 100, 1)
+    else:
+        margin_eur = margin_pct = None
+
     return {
         "total_eur": round(total),
         "breakdown": {
@@ -124,9 +134,10 @@ def landed_cost_from_values(
         },
         "tariff_rate": lane["tariff_rate"],
         "reroute_chokepoints": hot,
-        # cost ABOVE the bare cargo value — the part the exporter influences by
-        # choosing market/timing. Usually the clearest comparison number.
         "cost_to_serve_eur": round(total - goods),
+        "sell_price_eur": sell_price,
+        "margin_eur": margin_eur,
+        "margin_pct": margin_pct,
     }
 
 

@@ -21,6 +21,7 @@ from __future__ import annotations
 
 from flask import Flask, jsonify, render_template, request
 
+import alerts
 import backtest
 import briefing
 import chokepoints
@@ -92,8 +93,9 @@ def _build_state(refresh: bool = False, scenario: str = "baseline") -> dict:
     results = risk_model.score_all_lanes(
         bundle=_bundle_cache, persist=(scenario == "baseline"), scenario=scenario)
 
-    # 30-day trend series per lane from the SQLite store.
+    # 30-day trend series + yesterday's snapshot (for alerts) from SQLite.
     trends = {}
+    prev_snapshots = {}
     with storage.get_connection() as conn:
         for lane in data_sources.LANES:
             history = storage.load_history(conn, lane, limit=30)
@@ -103,6 +105,9 @@ def _build_state(refresh: bool = False, scenario: str = "baseline") -> dict:
                 "oil_price": [h["oil_price"] for h in history],
                 "risk_score": [h["risk_score"] for h in history],
             }
+            # Yesterday = second-most-recent row (index 1), most recent is today.
+            if len(history) >= 2:
+                prev_snapshots[lane] = history[-2]
 
     # Rank lanes by cost-to-serve. Framed as a margin/pricing monitor across the
     # exporter's EXISTING lanes — not a "which country to sell to" recommender.
@@ -117,11 +122,15 @@ def _build_state(refresh: bool = False, scenario: str = "baseline") -> dict:
         "priciest_total_eur": priciest["total_eur"],
     }
 
+    # Alerts: only meaningful on the baseline (stress scenarios don't have history).
+    lane_alerts = alerts.check_alerts(results, prev_snapshots, cfg) if scenario == "baseline" else []
+
     _state_cache[scenario] = {
         "results": results,
         "trends": trends,
         "ranking": ranking,
         "recommendation": recommendation,
+        "alerts": lane_alerts,
         "backtest": backtest.run_backtest(),
         "briefing": briefing.generate_briefing(
             results,

@@ -69,6 +69,26 @@
     .reco .detail { color: var(--muted); font-size: 13px; }
     .reco b { color: var(--text); }
 
+    /* ---- Alert strip ---- */
+    .alerts-strip { display: flex; flex-direction: column; gap: 6px; margin-bottom: 14px; }
+    .alert-item { display: flex; align-items: center; gap: 10px; padding: 10px 14px;
+                  border-radius: 8px; font-size: 13px; font-weight: 500; }
+    .alert-item.warning { background: #2d1a0a; border: 1px solid #c2410c; color: #fb923c; }
+    .alert-item.info    { background: #0d1f2d; border: 1px solid #1d4ed8; color: #60a5fa; }
+    .alert-item.ok      { background: #0d1f13; border: 1px solid #166534; color: #4ade80; }
+    .alert-item .a-icon { font-size: 16px; flex-shrink: 0; }
+    .alert-badge { display: inline-block; width: 8px; height: 8px; border-radius: 50%;
+                   margin-left: 5px; vertical-align: middle; }
+
+    /* ---- Margin row on cards ---- */
+    .margin-row { display: flex; justify-content: space-between; align-items: center;
+                  padding: 7px 0; border-top: 1px solid var(--border); margin-top: 6px; }
+    .margin-row .label { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: .8px; }
+    .margin-row .value { font-size: 14px; font-weight: 700; }
+    .margin-pos { color: #4ade80; }
+    .margin-neg { color: #f87171; }
+    .margin-pct { font-size: 11px; font-weight: 400; margin-left: 5px; opacity: .8; }
+
     /* ---- Landed cost block on cards ---- */
     .cost { margin-top: 14px; padding-top: 13px; border-top: 1px solid var(--border); }
     .cost .big { font-size: 24px; font-weight: 800; letter-spacing: -.6px; }
@@ -178,6 +198,8 @@
     </div>
 
     <div id="reco-host"></div>
+
+    <div id="alerts-host"></div>
 
     <div class="section-title">Lanes</div>
     <div class="cards" id="cards"><div class="loading">Fetching scores…</div></div>
@@ -401,6 +423,21 @@ function renderReco(state) {
     </div>`;
 }
 
+function renderAlerts(state) {
+  const host = document.getElementById("alerts-host");
+  const items = state.alerts || [];
+  if (!items.length) { host.innerHTML = ""; return; }
+  const icons = { warning: "⚠️", info: "ℹ️", ok: "✅" };
+  host.innerHTML = `
+    <div class="alerts-strip">
+      ${items.map(a => `
+        <div class="alert-item ${a.severity}">
+          <span class="a-icon">${icons[a.severity] || "•"}</span>
+          <span>${a.msg}</span>
+        </div>`).join("")}
+    </div>`;
+}
+
 function renderBacktest(state) {
   const bt = state.backtest;
   const host = document.getElementById("bt-host");
@@ -478,6 +515,14 @@ function renderCards(state) {
             : ''}
         </div>
       </div>
+      ${r.landed.margin_eur != null ? `
+      <div class="margin-row">
+        <span class="label">Gross margin / container</span>
+        <span class="value ${r.landed.margin_eur >= 0 ? 'margin-pos' : 'margin-neg'}">
+          ${eur(r.landed.margin_eur)}
+          <span class="margin-pct">(${r.landed.margin_pct}%)</span>
+        </span>
+      </div>` : ''}
       <div class="metrics">
         <span>EUR/${r.currency} <b>${m.fx_rate ?? "–"}</b></span>
         <span>Brent <b>$${m.oil_price ?? "–"}</b></span>
@@ -527,6 +572,7 @@ function render(state) {
   renderScenarios(state);
   renderMap(state);
   renderReco(state);
+  renderAlerts(state);
   renderCards(state);
   renderBacktest(state);
   document.getElementById("briefing").textContent = state.briefing;
