@@ -9,13 +9,16 @@ got there. It deliberately holds NO networking code — it asks data_sources for
 data and focuses purely on the math, so the logic is easy to read and test.
 
 THE CORE PROBLEM this file solves:
-    We have three signals in totally different units —
-        * FX volatility  (a % wobble)
-        * shipping cost   (dollars)
-        * news sentiment  (a mood)
-    To combine them we must put them on ONE comparable scale. We do that with
-    z-scores (distance from a baseline, measured in standard deviations) fed
-    through a sigmoid that squashes any z into 0-100, where z=0 -> 50 (neutral).
+    We blend FOUR signals in totally different units (weights in config.json):
+        * FX volatility       30%  (a % wobble)            — lane-specific
+        * fuel cost / Brent   20%  (dollars)               — global
+        * news sentiment      20%  (a mood)                — lane-specific
+        * chokepoint exposure 30%  (disruption risk)       — lane-specific
+                                   (computed in chokepoints.py)
+    To combine the first three we put them on ONE comparable scale with z-scores
+    (distance from a baseline, in standard deviations) fed through a sigmoid that
+    squashes any z into 0-100, where z=0 -> 50 (neutral). The chokepoint signal
+    is already a 0-100 exposure, so it slots straight in.
 
 WHY z-SCORES (and not fixed thresholds):
     MXN naturally swings more than EUR. A fixed "volatility above X = risky"
@@ -92,7 +95,7 @@ def _sorted_values(series: dict[str, float]) -> list[float]:
 
 
 # ---------------------------------------------------------------------------
-# Sub-score 1 — FX VOLATILITY (40%)
+# Sub-score 1 — FX VOLATILITY (30%, lane-specific)
 # ---------------------------------------------------------------------------
 def fx_volatility_subscore(ccy_series: dict[str, float], cfg: dict) -> dict:
     """
@@ -142,7 +145,7 @@ def fx_volatility_subscore(ccy_series: dict[str, float], cfg: dict) -> dict:
 
 
 # ---------------------------------------------------------------------------
-# Sub-score 2 — SHIPPING COST (35%) = freight (primary) + oil (secondary)
+# Sub-score 2 — FUEL COST (20%, Brent only, global)
 # ---------------------------------------------------------------------------
 def _cost_z(series: dict[str, float], lookback: int) -> tuple[float, float | None]:
     """
@@ -183,7 +186,7 @@ def fuel_cost_subscore(oil_series: dict, cfg: dict) -> dict:
 
 
 # ---------------------------------------------------------------------------
-# Sub-score 3 — NEWS SENTIMENT (25%)
+# Sub-score 3 — NEWS SENTIMENT (20%, lane-specific)
 # ---------------------------------------------------------------------------
 def news_sentiment_subscore(headlines: list[dict], cfg: dict) -> dict:
     """
@@ -240,7 +243,7 @@ def news_sentiment_subscore(headlines: list[dict], cfg: dict) -> dict:
 
 
 # ---------------------------------------------------------------------------
-# Combine the three into one lane score
+# Combine the four sub-scores into one lane score
 # ---------------------------------------------------------------------------
 def _band_for(score: float, cfg: dict) -> dict:
     """Map a 0-100 score to its labelled risk band (Low/Moderate/Elevated/High)."""
@@ -257,7 +260,7 @@ def score_lane(lane_key: str, bundle: dict, cfg: dict,
     (data_sources.fetch_all() output) and the config, under the given chokepoint
     `tensions` (defaults to the baseline climate if not supplied).
 
-    Final score = weighted sum of FOUR sub-scores (FX volatility, shipping cost,
+    Final score = weighted sum of FOUR sub-scores (FX volatility, fuel cost,
     news sentiment, chokepoint exposure), using config weights.
     """
     currency = data_sources.LANES[lane_key]["currency"]
