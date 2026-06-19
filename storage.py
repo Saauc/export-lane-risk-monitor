@@ -50,6 +50,8 @@ CREATE TABLE IF NOT EXISTS snapshots (
     oil_price       REAL,            -- Brent USD/bbl, that day
     news_sentiment  REAL,            -- -1..+1, snapshot-only (why we persist it)
     risk_score      REAL,            -- 0..100 final score (filled by Phase 2)
+    band            TEXT,            -- risk band label that day (drives alerts)
+    landed_cost     REAL,            -- total landed cost EUR that day (drives alerts)
     components      TEXT,            -- JSON: per-input sub-scores/details
     updated_at      TEXT NOT NULL,   -- when this row was last written
     PRIMARY KEY (date, lane)         -- one row per lane per day; re-runs UPSERT
@@ -72,11 +74,24 @@ def get_connection(db_path: Path | str = DB_PATH):
     conn = sqlite3.connect(db_path)
     conn.row_factory = sqlite3.Row
     conn.execute(_SCHEMA)  # ensure the table exists before anyone uses it
+    _migrate(conn)         # add any columns missing from an older DB
     try:
         yield conn
         conn.commit()
     finally:
         conn.close()
+
+
+# Columns added after the original schema shipped. CREATE TABLE IF NOT EXISTS
+# won't add these to a pre-existing DB, so we ALTER them in idempotently.
+_LATER_COLUMNS = {"band": "TEXT", "landed_cost": "REAL"}
+
+
+def _migrate(conn: sqlite3.Connection) -> None:
+    existing = {row["name"] for row in conn.execute("PRAGMA table_info(snapshots)")}
+    for col, coltype in _LATER_COLUMNS.items():
+        if col not in existing:
+            conn.execute(f"ALTER TABLE snapshots ADD COLUMN {col} {coltype}")
 
 
 def save_snapshot(
@@ -88,6 +103,8 @@ def save_snapshot(
     oil_price: float | None = None,
     news_sentiment: float | None = None,
     risk_score: float | None = None,
+    band: str | None = None,
+    landed_cost: float | None = None,
     components: dict | None = None,
 ) -> None:
     """
@@ -109,10 +126,10 @@ def save_snapshot(
         """
         INSERT INTO snapshots
             (date, lane, fx_rate, oil_price,
-             news_sentiment, risk_score, components, updated_at)
+             news_sentiment, risk_score, band, landed_cost, components, updated_at)
         VALUES
             (:date, :lane, :fx_rate, :oil_price,
-             :news_sentiment, :risk_score, :components, datetime('now'))
+             :news_sentiment, :risk_score, :band, :landed_cost, :components, datetime('now'))
         ON CONFLICT(date, lane) DO UPDATE SET
             -- COALESCE(new, old): only overwrite a column when the new value is
             -- non-NULL, so a partial later write never wipes earlier data.
@@ -120,6 +137,8 @@ def save_snapshot(
             oil_price      = COALESCE(excluded.oil_price, snapshots.oil_price),
             news_sentiment = COALESCE(excluded.news_sentiment, snapshots.news_sentiment),
             risk_score     = COALESCE(excluded.risk_score, snapshots.risk_score),
+            band           = COALESCE(excluded.band, snapshots.band),
+            landed_cost    = COALESCE(excluded.landed_cost, snapshots.landed_cost),
             components     = COALESCE(excluded.components, snapshots.components),
             updated_at     = datetime('now')
         """,
@@ -130,6 +149,8 @@ def save_snapshot(
             "oil_price": oil_price,
             "news_sentiment": news_sentiment,
             "risk_score": risk_score,
+            "band": band,
+            "landed_cost": landed_cost,
             "components": components_json,
         },
     )

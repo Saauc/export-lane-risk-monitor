@@ -363,6 +363,8 @@ def score_all_lanes(bundle: dict | None = None, persist: bool = True,
                     oil_price=r["metrics"]["oil_price"],
                     news_sentiment=r["metrics"]["news_sentiment"],
                     risk_score=r["risk_score"],
+                    band=r["band"],
+                    landed_cost=r["landed"]["total_eur"],
                     components=r["subscores"],
                 )
 

@@ -10,6 +10,7 @@ Run with:  python -m unittest -v   (or just: python test_model.py)
 
 import unittest
 
+import alerts
 import chokepoints
 import landed_cost
 import risk_model
@@ -133,6 +134,69 @@ class TestChokepoints(unittest.TestCase):
         us_calm = landed_cost.landed_cost_from_values("US", 80, self.cfg, calm)
         us_crisis = landed_cost.landed_cost_from_values("US", 80, self.cfg, crisis)
         self.assertGreater(us_crisis["total_eur"], us_calm["total_eur"])
+
+
+class TestAlerts(unittest.TestCase):
+    def setUp(self):
+        self.cfg = risk_model.load_config()
+        # cfg["alerts"] must exist for the engine to read thresholds.
+        self.assertIn("alerts", self.cfg)
+
+    def _result(self, band, cost):
+        # Minimal results-shaped dict the alert engine reads.
+        return {"US": {"market": "United States", "band": band,
+                       "landed": {"total_eur": cost}}}
+
+    def test_band_worsening_fires_warning(self):
+        results = self._result("Elevated", 50000)
+        history = {"US": {"band": "Low", "landed_cost": 50000}}
+        out = alerts.check_alerts(results, history, self.cfg)
+        self.assertTrue(any(a["type"] == "band_up" and a["severity"] == "warning"
+                            for a in out))
+
+    def test_band_easing_fires_ok(self):
+        results = self._result("Low", 50000)
+        history = {"US": {"band": "Elevated", "landed_cost": 50000}}
+        out = alerts.check_alerts(results, history, self.cfg)
+        self.assertTrue(any(a["type"] == "band_down" and a["severity"] == "ok"
+                            for a in out))
+
+    def test_cost_jump_over_threshold_fires(self):
+        # +10% cost move, well over the 3% threshold -> warning.
+        results = self._result("Low", 55000)
+        history = {"US": {"band": "Low", "landed_cost": 50000}}
+        out = alerts.check_alerts(results, history, self.cfg)
+        self.assertTrue(any(a["type"] == "cost_up" for a in out))
+
+    def test_small_cost_move_stays_silent(self):
+        # +1% move, under threshold, same band -> no alerts.
+        results = self._result("Low", 50500)
+        history = {"US": {"band": "Low", "landed_cost": 50000}}
+        out = alerts.check_alerts(results, history, self.cfg)
+        self.assertEqual(out, [])
+
+    def test_no_history_is_silent(self):
+        # First-ever run (no prior snapshot) must not fire.
+        out = alerts.check_alerts(self._result("High", 99999), {}, self.cfg)
+        self.assertEqual(out, [])
+
+
+class TestMargin(unittest.TestCase):
+    def setUp(self):
+        self.cfg = risk_model.load_config()
+
+    def test_margin_equals_sell_minus_landed(self):
+        out = landed_cost.landed_cost_from_values("US", 80, self.cfg)
+        sell = self.cfg["landed_cost"]["lanes"]["US"]["sell_price_eur"]
+        self.assertEqual(out["margin_eur"], round(sell - out["total_eur"]))
+
+    def test_margin_shrinks_under_stress(self):
+        # A Hormuz crisis lifts cost, so margin must fall vs baseline.
+        calm = chokepoints.resolve_tensions(self.cfg, "baseline")
+        crisis = chokepoints.resolve_tensions(self.cfg, "hormuz_crisis")
+        base = landed_cost.landed_cost_from_values("US", 80, self.cfg, calm)
+        hit = landed_cost.landed_cost_from_values("US", 80, self.cfg, crisis)
+        self.assertLess(hit["margin_eur"], base["margin_eur"])
 
 
 if __name__ == "__main__":

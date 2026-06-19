@@ -60,7 +60,7 @@
   },
 
   "landed_cost": {
-    "_comment": "Estimated all-in EUR cost to land one representative CONTAINER of coatings in each market. container_freight_eur is a lane-specific container freight estimate (a real container index such as Drewry WCI / Freightos FBX is the correct instrument but isn't freely available via API, so these are illustrative, tunable placeholders). base_bunker_eur scales with live Brent vs baseline_oil. tariff_rate is the destination duty (the live US Section 122 10% shows up as real euros; CETA/EU-Mexico land near zero).",
+    "_comment": "Estimated all-in EUR cost to land one representative CONTAINER of coatings in each market. container_freight_eur is a lane-specific container freight estimate (a real container index such as Drewry WCI / Freightos FBX is the correct instrument but isn't freely available via API, so these are illustrative, tunable placeholders). base_bunker_eur scales with live Brent vs baseline_oil. tariff_rate is the destination duty (the live US Section 122 10% shows up as real euros; CETA/EU-Mexico land near zero). sell_price_eur is an illustrative per-lane invoice price (EUR-equiv) used for the gross-margin layer — a tunable placeholder the commercial team would set from real price lists.",
     "container_goods_value_eur": 40000,
     "handling_docs_insurance_eur": 1200,
     "baseline_oil": 80.0,
