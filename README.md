@@ -1,4 +1,7 @@
-# 🛳️ Trade Lane Monitor
+# 🛳️ Export Lane Risk Monitor
+
+**[Live demo → trade-lane-monitor.onrender.com](https://trade-lane-monitor.onrender.com)**  
+<sub>Free tier — may take ~30s to wake up after inactivity.</sub>
 
 **Cost-to-serve & market-risk monitor for an exporter shipping out of Barcelona** to its seven existing markets — **US, Mexico, Canada, UK, Brazil, Australia and China**. It pulls live FX, oil and trade-news signals, estimates the all-in EUR **cost to land a container in each market**, tracks the **cost-to-serve spread** (for pricing / surcharge-timing / FX-hedging / inventory decisions — *not* a "which country to sell to" recommender), **backtests** the cost model, and **stress-tests** every lane against maritime-chokepoint disruptions (Red Sea, Hormuz).
 
