@@ -1,0 +1,152 @@
+{
+  "_comment": "All tunable knobs for the risk model live here so the logic in risk_model.py stays clean and nothing is hard-coded. Edit weights/thresholds without touching code.",
+  "branding": {
+    "_comment": "Flip 'mode' to retarget the whole UI with zero code changes. 'generic' is the publishable default; 'coatings' adds the specialty-chemicals flavour. Same engine either way \u2014 add your own profile (e.g. a specific company) without touching code.",
+    "mode": "generic",
+    "profiles": {
+      "generic": {
+        "title": "Export Lane Risk Monitor",
+        "subtitle": "Landed-cost & market risk for a Barcelona-based exporter \u2014 7 global markets, chokepoint stress-tested",
+        "cargo": "goods"
+      },
+      "coatings": {
+        "title": "Coatings Export Lane Monitor",
+        "subtitle": "Landed-cost & market risk for a Spanish specialty-coatings exporter \u2014 7 global markets, chokepoint stress-tested",
+        "cargo": "coatings"
+      }
+    }
+  },
+  "weights": {
+    "_comment": "Top-level component weights, must sum to 1.0. Three of the four are LANE-SPECIFIC (FX, news, chokepoint) so they drive the ranking; fuel cost is a GLOBAL driver (Brent is one world price), so it's intentionally the smallest weight — it shifts every lane together rather than discriminating between them. (A lane-specific container-freight index like Drewry WCI / Freightos FBX would let fuel/freight discriminate too, but those aren't freely available via API.)",
+    "fx_volatility": 0.30,
+    "fuel_cost": 0.20,
+    "news_sentiment": 0.20,
+    "chokepoint": 0.30
+  },
+  "fx_volatility": {
+    "_comment": "Rolling window (business days) used to measure realized FX volatility. The current 30-day vol is z-scored against the distribution of all rolling-window vols in the fetched history.",
+    "rolling_window": 30
+  },
+  "fuel_cost": {
+    "_comment": "Fuel (bunker) cost risk = Brent crude z-scored vs its trailing average. Oil is the real, live driver of container bunker surcharges; it's a global price, so this sub-score is the same for every lane by design.",
+    "lookback_days": 90
+  },
+  "scoring": {
+    "_comment": "sigmoid_k controls how sharply a z-score is squashed into 0-100. score = 100 / (1 + e^(-k*z)); z=0 -> 50. Higher k = more sensitive. z is clamped to +/- z_clamp first to stop tiny baselines from producing absurd scores. news_sentiment_scale divides the avg keyword net before tanh, so a typical 1-2 net words doesn't instantly saturate the sentiment to +/-1.",
+    "sigmoid_k": 0.9,
+    "z_clamp": 3.0,
+    "news_sentiment_scale": 2.5
+  },
+  "chokepoints": {
+    "_comment": "Strategic maritime chokepoints with a baseline 'tension' 0-100 reflecting the real mid-2026 climate (Red Sea/Bab-el-Mandeb high from Houthi disruption; Suez elevated). A lane is EXPOSED (risk) to the chokepoints on its natural corridor whether it transits them or is forced to divert. When a corridor chokepoint's tension >= reroute_threshold the lane DIVERTS around the Cape of Good Hope: the map redraws the Cape route, the legend says 'diverting', and a reroute_premium is added to COST. Risk-exposure (0-100 score) and the reroute COST (euros) are two different outputs of the same disruption, not a double-count. Hormuz is oil_linked: it is NOT on any lane's route, but its tension feeds GLOBAL fuel + feedstock cost (coatings are petroleum-derived), so a Hormuz crisis lifts every lane's euro cost.",
+    "points": {
+      "Gibraltar":     { "lon": -5.6,  "lat": 35.95, "tension": 10 },
+      "Suez Canal":    { "lon": 32.35, "lat": 30.0,  "tension": 55 },
+      "Bab-el-Mandeb": { "lon": 43.3,  "lat": 12.6,  "tension": 75 },
+      "Hormuz":        { "lon": 56.3,  "lat": 26.6,  "tension": 40, "oil_linked": true },
+      "Malacca":       { "lon": 101.0, "lat": 2.8,   "tension": 20 }
+    },
+    "reroute_threshold": 60,
+    "reroute_premium_eur": 1800,
+    "hormuz_oil_sensitivity": 0.4,
+    "feedstock_oil_share": 0.15
+  },
+
+  "scenarios": {
+    "_comment": "Named stress scenarios. Each overrides chokepoint tensions; the dashboard flips between them and recomputes risk + cost. 'baseline' is the current real climate. 'hormuz_crisis' acts through the GLOBAL fuel/feedstock channel (no lane transits Hormuz), so it lifts every lane's cost rather than any single route's risk.",
+    "baseline":        { "label": "Baseline (today)",  "overrides": {} },
+    "red_sea_closure": { "label": "Red Sea closure",   "overrides": { "Bab-el-Mandeb": 100, "Suez Canal": 95 } },
+    "hormuz_crisis":   { "label": "Hormuz crisis (oil)", "overrides": { "Hormuz": 100 } }
+  },
+
+  "landed_cost": {
+    "_comment": "Estimated all-in EUR cost to land one representative CONTAINER of coatings in each market. container_freight_eur is a lane-specific container freight estimate (a real container index such as Drewry WCI / Freightos FBX is the correct instrument but isn't freely available via API, so these are illustrative, tunable placeholders). base_bunker_eur scales with live Brent vs baseline_oil. tariff_rate is the destination duty (the live US Section 122 10% shows up as real euros; CETA/EU-Mexico land near zero).",
+    "container_goods_value_eur": 40000,
+    "handling_docs_insurance_eur": 1200,
+    "baseline_oil": 80.0,
+    "lanes": {
+      "US": { "container_freight_eur": 2600, "base_bunker_eur": 600,  "tariff_rate": 0.10 },
+      "MX": { "container_freight_eur": 2900, "base_bunker_eur": 700,  "tariff_rate": 0.00 },
+      "CA": { "container_freight_eur": 2400, "base_bunker_eur": 550,  "tariff_rate": 0.00 },
+      "UK": { "container_freight_eur": 1800, "base_bunker_eur": 400,  "tariff_rate": 0.00 },
+      "BR": { "container_freight_eur": 3000, "base_bunker_eur": 750,  "tariff_rate": 0.14 },
+      "AU": { "container_freight_eur": 4200, "base_bunker_eur": 1100, "tariff_rate": 0.05 },
+      "CN": { "container_freight_eur": 4500, "base_bunker_eur": 1200, "tariff_rate": 0.08 }
+    }
+  },
+  "risk_bands": [
+    { "label": "Low",      "max": 30,  "color": "#22c55e" },
+    { "label": "Moderate", "max": 45,  "color": "#eab308" },
+    { "label": "Elevated", "max": 62,  "color": "#f97316" },
+    { "label": "High",     "max": 100, "color": "#ef4444" }
+  ],
+  "news_lexicon": {
+    "_comment": "Transparent keyword lexicon for headline sentiment. Each match nudges sentiment toward risk (negative) or calm (positive). Lowercased word-boundary match. Kept in config so the signal is auditable and tunable, not a black box.",
+    "negative": [
+      "tariff",
+      "tariffs",
+      "sanction",
+      "sanctions",
+      "ban",
+      "embargo",
+      "strike",
+      "shutdown",
+      "delay",
+      "delays",
+      "congestion",
+      "backlog",
+      "disruption",
+      "disrupt",
+      "conflict",
+      "war",
+      "attack",
+      "blockade",
+      "shortage",
+      "shortages",
+      "halt",
+      "suspend",
+      "suspended",
+      "dispute",
+      "crisis",
+      "recession",
+      "slump",
+      "plunge",
+      "surge",
+      "spike",
+      "threat",
+      "threaten",
+      "retaliation",
+      "retaliate",
+      "probe",
+      "restriction",
+      "restrictions"
+    ],
+    "positive": [
+      "deal",
+      "agreement",
+      "accord",
+      "ease",
+      "eases",
+      "easing",
+      "resume",
+      "resumes",
+      "resumed",
+      "recovery",
+      "recover",
+      "rebound",
+      "stabilize",
+      "stabilise",
+      "resolve",
+      "resolved",
+      "resolution",
+      "boost",
+      "growth",
+      "expansion",
+      "cooperation",
+      "exempt",
+      "exemption",
+      "relief",
+      "reopen"
+    ]
+  }
+}

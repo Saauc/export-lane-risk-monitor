@@ -1,0 +1,556 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>{{ branding.title }}</title>
+
+  <!-- Third-party libs from CDN (no build step, no keys):
+       D3 + TopoJSON  -> the world map and great-circle lane arcs
+       Chart.js       -> the 30-day trend charts -->
+  <script src="https://cdn.jsdelivr.net/npm/d3@7"></script>
+  <script src="https://cdn.jsdelivr.net/npm/topojson-client@3"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+
+  <style>
+    /* ---- Dark theme palette ---- */
+    :root {
+      --bg: #0b0f17;
+      --panel: #131a26;
+      --panel-2: #1a2333;
+      --border: #243044;
+      --text: #e6edf6;
+      --muted: #8595ad;
+      --accent: #38bdf8;
+      --ocean: #0d1521;
+      --land: #233047;
+      --land-stroke: #2f3e57;
+      --radius: 16px;
+      --shadow: 0 10px 34px rgba(0,0,0,.38);
+      --mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      background:
+        radial-gradient(1100px 560px at 88% -8%, rgba(56,189,248,.07), transparent 60%),
+        radial-gradient(900px 520px at -5% -5%, rgba(34,197,94,.05), transparent 55%),
+        var(--bg);
+      background-attachment: fixed;
+      color: var(--text);
+      font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      -webkit-font-smoothing: antialiased;
+      font-feature-settings: "tnum" 1;
+      line-height: 1.45;
+    }
+    .wrap { max-width: 1200px; margin: 0 auto; padding: 34px 26px 72px; }
+
+    header.top { display: flex; align-items: flex-start; justify-content: space-between; flex-wrap: wrap; gap: 14px; }
+    header.top h1 { font-size: 25px; font-weight: 800; margin: 0; letter-spacing: -.5px; display: flex; align-items: center; gap: 10px; }
+    header.top .sub { color: var(--muted); font-size: 13px; line-height: 1.55; max-width: 720px; }
+    #refresh {
+      background: var(--panel-2); color: var(--text); border: 1px solid var(--border); font-family: inherit;
+      padding: 9px 16px; border-radius: 10px; cursor: pointer; font-size: 13px; font-weight: 500; transition: all .15s;
+    }
+    #refresh:hover { border-color: var(--accent); color: var(--accent); box-shadow: 0 0 0 3px rgba(56,189,248,.08); }
+    #refresh:disabled { opacity: .5; cursor: default; }
+
+    .section-title { font-size: 11.5px; text-transform: uppercase; letter-spacing: 1.6px; color: var(--muted); font-weight: 600; margin: 34px 0 14px; }
+
+    /* ---- Recommendation banner ---- */
+    .reco { background: linear-gradient(135deg, #0f2c1e, #131a26 70%); border: 1px solid #1d4d36;
+            border-left: 4px solid var(--good, #22c55e); border-radius: var(--radius); padding: 18px 22px; margin-top: 14px; box-shadow: var(--shadow); }
+    .reco .lead { font-size: 11px; text-transform: uppercase; letter-spacing: 1.2px; color: #6ee7a8; font-weight: 600; }
+    .reco .headline { font-size: 20px; font-weight: 800; letter-spacing: -.4px; margin: 5px 0 3px; }
+    .reco .detail { color: var(--muted); font-size: 13px; }
+    .reco b { color: var(--text); }
+
+    /* ---- Landed cost block on cards ---- */
+    .cost { margin-top: 14px; padding-top: 13px; border-top: 1px solid var(--border); }
+    .cost .big { font-size: 24px; font-weight: 800; letter-spacing: -.6px; }
+    .cost .lbl { color: var(--muted); font-size: 10px; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 2px; }
+    .cost .bd { color: var(--muted); font-size: 11px; margin-top: 7px; line-height: 1.65; }
+    .cost .bd .tar { color: #f59e0b; font-weight: 600; }
+
+    /* ---- Scenario selector ---- */
+    .scenario-bar { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+    .scen-label { color: var(--muted); font-size: 12px; }
+    .scen-btn { background: var(--panel-2); color: var(--text); border: 1px solid var(--border); padding: 7px 15px; border-radius: 999px; cursor: pointer; font-size: 12px; font-weight: 500; font-family: inherit; transition: all .15s; }
+    .scen-btn:hover { border-color: var(--accent); color: var(--accent); }
+    .scen-btn.on { background: var(--accent); color: #06121c; border-color: var(--accent); font-weight: 600; box-shadow: 0 4px 14px rgba(56,189,248,.25); }
+
+    /* ---- Hero map ---- */
+    .map-panel { background: linear-gradient(180deg, #131a26, #0f1520); border: 1px solid var(--border); border-radius: 14px; padding: 8px; overflow: hidden; box-shadow: 0 8px 30px rgba(0,0,0,.35); }
+    svg#map { width: 100%; height: auto; display: block; background: var(--ocean); border-radius: 10px; }
+    .country { fill: var(--land); stroke: var(--land-stroke); stroke-width: .4px; }
+    .arc { fill: none; stroke-width: 2.6px; stroke-linecap: round; opacity: .92;
+           stroke-dasharray: 6 7; animation: flow 1.4s linear infinite; transition: opacity .15s; }
+    .arc.dim { opacity: .1; }
+    .arc.hot { stroke-width: 4px; opacity: 1; }
+    .choke { cursor: pointer; }
+    .choke.sel { stroke: #fff; stroke-width: 2px; }
+    /* dark halo so coloured score numbers stay legible over the map */
+    .map-score { paint-order: stroke; stroke: #0b0f17; stroke-width: 3.5px; stroke-linejoin: round; font-weight: 700; }
+    .tooltip { position: fixed; pointer-events: none; background: var(--panel-2); border: 1px solid var(--border);
+               border-radius: 8px; padding: 8px 10px; font-size: 12px; color: var(--text); opacity: 0;
+               transition: opacity .1s; z-index: 60; max-width: 250px; line-height: 1.55;
+               box-shadow: 0 6px 18px rgba(0,0,0,.5); }
+    @keyframes flow { to { stroke-dashoffset: -13; } }
+    .node { stroke: #0b0f17; stroke-width: 1.4px; }
+    .choke { fill: #f59e0b; opacity: .9; stroke: #0b0f17; stroke-width: 1px; }
+    .choke-label { fill: #9fb0c8; font-size: 8px; font-weight: 600; letter-spacing: .2px; pointer-events: none; opacity: .85; }
+    .map-legend { display: flex; gap: 16px; flex-wrap: wrap; padding: 8px 6px 4px; font-size: 12px; color: var(--muted); }
+    .map-legend .item { display: flex; align-items: center; gap: 6px; }
+    .dot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; }
+    .map-legend.scales { gap: 22px; border-bottom: 1px solid var(--border); padding-bottom: 10px; margin-bottom: 4px; }
+    .scale { display: inline-flex; align-items: center; gap: 6px; }
+    .scale .grad { width: 60px; height: 8px; border-radius: 4px; display: inline-block; }
+    .scale .dot { width: 8px; height: 8px; }
+    .scale .ends { color: var(--muted); font-size: 11px; }
+
+    /* ---- Lane cards ---- */
+    .cards { display: grid; grid-template-columns: repeat(3, 1fr); gap: 18px; }
+    @media (max-width: 880px) { .cards { grid-template-columns: 1fr; } }
+    .card { background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius); padding: 20px 20px 18px;
+            border-top: 3px solid var(--border); box-shadow: var(--shadow); transition: transform .16s ease, border-color .16s; }
+    .card:hover { transform: translateY(-3px); }
+    .card h3 { margin: 0 0 3px; font-size: 16px; font-weight: 700; letter-spacing: -.2px; }
+    .card .ccy { color: var(--muted); font-size: 11px; line-height: 1.5; }
+    .score-row { display: flex; align-items: baseline; gap: 11px; margin: 16px 0 2px; }
+    .score { font-size: 46px; font-weight: 800; line-height: .9; letter-spacing: -2px; }
+    .band { font-size: 10.5px; font-weight: 600; padding: 4px 10px; border-radius: 20px; text-transform: uppercase; letter-spacing: .5px; }
+    .bars { margin: 18px 0 4px; }
+    .bar-row { display: grid; grid-template-columns: 100px 1fr 30px; align-items: center; gap: 9px; margin: 8px 0; font-size: 11.5px; color: var(--muted); }
+    .track { height: 6px; background: var(--panel-2); border-radius: 6px; overflow: hidden; }
+    .fill { height: 100%; border-radius: 6px; transition: width .35s ease; }
+    .bar-val { text-align: right; color: var(--text); font-weight: 600; }
+    .metrics { display: flex; gap: 14px; flex-wrap: wrap; margin-top: 14px; padding-top: 13px; border-top: 1px solid var(--border); font-size: 11.5px; color: var(--muted); }
+    .metrics b { color: var(--text); font-weight: 600; }
+    .chart-box { margin-top: 14px; height: 116px; }
+
+    /* ---- Backtest panel ---- */
+    .bt { background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius); padding: 20px 22px; box-shadow: var(--shadow); }
+    .bt .hl { font-size: 15px; font-weight: 600; margin-bottom: 10px; }
+    .bt .hl b { color: var(--accent); }
+    .bt .grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px 24px; }
+    @media (max-width: 700px) { .bt .grid { grid-template-columns: 1fr; } }
+    .bt .row { display: flex; justify-content: space-between; font-size: 12.5px; color: var(--muted); border-bottom: 1px solid var(--border); padding: 6px 0; }
+    .bt .row b { color: var(--text); font-variant-numeric: tabular-nums; }
+    .bt .note { color: var(--muted); font-size: 11px; margin-top: 10px; font-style: italic; }
+    .bt .pos { color: #22c55e; } .bt .neg { color: #ef4444; }
+
+    /* ---- Briefing ---- */
+    .briefing { background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius); padding: 20px 22px; box-shadow: var(--shadow); }
+    .briefing pre { margin: 0; white-space: pre-wrap; font-family: var(--mono); font-size: 12px; line-height: 1.7; color: var(--text); }
+    .loading { color: var(--muted); padding: 40px; text-align: center; }
+    footer.foot { color: var(--muted); font-size: 11.5px; margin-top: 30px; text-align: center; }
+  </style>
+</head>
+<body>
+  <div id="tooltip" class="tooltip"></div>
+  <div class="wrap">
+    <header class="top">
+      <div>
+        <h1>🛳️ {{ branding.title }}</h1>
+        <div class="sub" id="subtitle">Loading live data…</div>
+        <div class="sub" style="margin-top:2px">{{ branding.subtitle }}</div>
+      </div>
+      <button id="refresh">↻ Refresh data</button>
+    </header>
+
+    <div class="section-title">Lane risk map</div>
+    <div class="scenario-bar" id="scenario-host"></div>
+    <div class="map-panel">
+      <svg id="map" viewBox="0 0 960 440" preserveAspectRatio="xMidYMid meet"></svg>
+      <div class="map-legend scales">
+        <span class="scale">Lane risk
+          <i class="grad" style="background:linear-gradient(90deg,#22c55e,#eab308,#ef4444)"></i>
+          <span class="ends">low → high</span></span>
+        <span class="scale">Chokepoint tension
+          <i class="dot" style="background:#22c55e"></i><i class="dot" style="background:#eab308"></i><i class="dot" style="background:#f97316"></i><i class="dot" style="background:#ef4444"></i>
+          <span class="ends">calm → crisis</span></span>
+      </div>
+      <div class="map-legend" id="legend"></div>
+    </div>
+
+    <div id="reco-host"></div>
+
+    <div class="section-title">Lanes</div>
+    <div class="cards" id="cards"><div class="loading">Fetching scores…</div></div>
+
+    <div id="bt-host"></div>
+
+    <div class="section-title">Daily briefing</div>
+    <div class="briefing"><pre id="briefing">…</pre></div>
+
+    <footer class="foot">
+      Live data: frankfurter.app (FX), Yahoo Finance (Brent crude), Google News RSS.
+      Container freight &amp; chokepoint tensions are configured estimates (Drewry/Freightos in production).
+      US Section 122 10% tariff is a real regime (eff. 24 Feb 2026, expires ~24 Jul 2026; under legal challenge).
+      Cost figures are illustrative, not a freight quote or investment advice.
+    </footer>
+  </div>
+
+<script>
+// ---- Each lane is a WATER ROUTE out of Barcelona: an ordered list of waypoints
+// that bends through real chokepoints. `via` names the chokepoints it transits
+// (must match the chokepoint risk model). Atlantic lanes exit via Gibraltar;
+// Australia & China head east through Suez and the Red Sea.
+// Routes are hand-traced through open water. Atlantic lanes hug the Spanish
+// Mediterranean coast out to Gibraltar (a straight Barcelona->Gibraltar line
+// would cut across mainland Spain); Australia & China head EAST through the
+// Med to Suez, down the Red Sea, then round the relevant landmasses.
+const ESP = [[2.17,41.39], [0.3,39.0], [-2.2,36.7], [-5.6,35.95]];   // Barcelona -> Gibraltar, over water
+const MED = [[2.17,41.39], [4,38.5], [9.5,38.0], [12,37], [16,35],   // Barcelona -> ... -> Suez -> Bab-el-Mandeb
+             [23,34], [29,33], [32.5,31.3], [33.5,28], [35,24], [38,20], [43.3,12.6]];
+const LANE_GEO = {
+  US: { name: "US · Miami",        via: ["Gibraltar"],
+    route: [...ESP, [-20,33], [-45,30], [-68,29], [-79.6,27], [-80.19,25.76]] },
+  MX: { name: "Mexico · Veracruz", via: ["Gibraltar"],
+    route: [...ESP, [-30,28], [-66,19], [-82,16.5], [-91,19], [-96.14,19.2]] },
+  CA: { name: "Canada · Montreal", via: ["Gibraltar"],
+    route: [...ESP, [-25,40], [-50,45], [-58,47], [-62,48.5], [-67,48.8], [-69.8,48], [-73.55,45.5]] },
+  UK: { name: "UK · Felixstowe",   via: ["Gibraltar"],
+    route: [...ESP, [-10,40], [-10,46], [-6,48.5], [-2,49.5], [1.3,51.95]] },
+  BR: { name: "Brazil · Santos",   via: ["Gibraltar"],
+    route: [...ESP, [-18,25], [-26,8], [-33,-8], [-42,-20], [-46.3,-23.96]] },
+  AU: { name: "Australia · Sydney", via: ["Suez Canal","Bab-el-Mandeb"],
+    route: [...MED, [52,13], [65,10], [78,4], [92,-6], [105,-15], [112,-26],
+            [120,-34], [133,-37], [145,-40], [150,-38], [151.2,-33.87]] },
+  CN: { name: "China · Shanghai",  via: ["Suez Canal","Bab-el-Mandeb","Malacca"],
+    route: [...MED, [52,13], [65,10], [80,5], [93,4], [99,3.5], [101,2.8],
+            [104,2], [106,5], [110,10], [114,18], [119,24], [122,29], [121.5,31.2]] },
+};
+
+// Diversion routes around the Cape of Good Hope, drawn when the Red Sea is too
+// disrupted to transit (this is what actually adds the reroute premium, so the
+// map and the cost stay consistent).
+const CAPE = [...ESP, [-12,28], [-18,15], [-16,2], [-6,-12], [6,-25], [15,-33], [19,-35], [28,-36], [42,-35]];
+LANE_GEO.AU.cape = [...CAPE, [62,-38], [90,-40], [115,-38], [133,-38], [145,-40], [150,-38], [151.2,-33.87]];
+LANE_GEO.CN.cape = [...CAPE, [60,-22], [80,-6], [93,2], [101,2.8], [104,2], [106,5], [110,10], [114,18], [119,24], [122,29], [121.5,31.2]];
+
+// Colour a chokepoint marker by its 0-100 tension (calm green -> crisis red).
+function tensionColor(t) {
+  if (t >= 80) return "#ef4444";
+  if (t >= 60) return "#f97316";
+  if (t >= 30) return "#eab308";
+  return "#22c55e";
+}
+
+// Continuous risk colour: green (calm) -> amber -> red (high). Gives the map a
+// real gradient instead of one flat band colour when scores cluster.
+function riskColor(score) {
+  const stops = [[0, [34, 197, 94]], [50, [234, 179, 8]], [100, [239, 68, 68]]];
+  const s = Math.max(0, Math.min(100, score));
+  const [a, b] = s >= 50 ? [stops[1], stops[2]] : [stops[0], stops[1]];
+  const t = (s - a[0]) / (b[0] - a[0]);
+  const c = a[1].map((v, i) => Math.round(v + (b[1][i] - v) * t));
+  return `rgb(${c[0]},${c[1]},${c[2]})`;
+}
+
+// ---- Map projection (Natural Earth looks clean for a world view) ----
+const projection = d3.geoNaturalEarth1().scale(178).translate([480, 235]);
+const geoPath = d3.geoPath(projection);
+
+let chartRegistry = {}; // keep Chart.js instances so we can destroy on refresh
+let currentScenario = "baseline"; // active stress scenario
+
+function renderScenarios(state) {
+  const host = document.getElementById("scenario-host");
+  if (!state.scenarios) { host.innerHTML = ""; return; }
+  host.innerHTML = `<span class="scen-label">Stress scenario:</span>` +
+    state.scenarios.options.map(o =>
+      `<button class="scen-btn ${o.key === state.scenarios.active ? 'on' : ''}" data-scen="${o.key}">${o.label}</button>`
+    ).join("");
+  host.querySelectorAll(".scen-btn").forEach(b =>
+    b.addEventListener("click", () => { currentScenario = b.dataset.scen; load(false); }));
+}
+
+async function drawWorld() {
+  // world-atlas 110m: small TopoJSON of country borders, no key needed.
+  const topo = await fetch("https://cdn.jsdelivr.net/npm/world-atlas@2/countries-110m.json").then(r => r.json());
+  const countries = topojson.feature(topo, topo.objects.countries);
+  const svg = d3.select("#map");
+  svg.append("g").selectAll("path")
+    .data(countries.features).enter().append("path")
+    .attr("class", "country").attr("d", geoPath);
+  // Layer that arcs/nodes get drawn into later (on top of countries).
+  svg.append("g").attr("id", "arcs");
+}
+
+function waterRoute(points) {
+  // Stitch great-circle segments between consecutive waypoints, so the whole
+  // line follows a plausible sea lane (through chokepoints) rather than one
+  // straight geodesic that would cut across continents.
+  const coords = [];
+  for (let i = 0; i < points.length - 1; i++) {
+    const interp = d3.geoInterpolate(points[i], points[i + 1]);
+    const steps = 24;
+    for (let s = 0; s <= steps; s++) coords.push(interp(s / steps));
+  }
+  return { type: "LineString", coordinates: coords };
+}
+
+// ---- Tooltip + chokepoint-selection state ----
+let selectedChoke = null; // name of a clicked chokepoint, or null
+function tip() { return document.getElementById("tooltip"); }
+function showTip(html, e) { const t = tip(); t.innerHTML = html; t.style.opacity = 1; moveTip(e); }
+function moveTip(e) { const t = tip(); t.style.left = (e.clientX + 14) + "px"; t.style.top = (e.clientY + 14) + "px"; }
+function hideTip() { tip().style.opacity = 0; }
+// Which lane names transit a given chokepoint.
+function lanesThrough(name) {
+  return Object.values(LANE_GEO).filter(g => g.via.includes(name)).map(g => g.name);
+}
+
+function renderMap(state) {
+  const g = d3.select("#arcs");
+  g.selectAll("*").remove();
+  const legend = d3.select("#legend"); legend.html("");
+
+  // Tension lookup + reroute threshold for deciding Cape diversions.
+  const tension = {};
+  (state.scenarios && state.scenarios.chokepoints || []).forEach(c => tension[c.name] = c.tension);
+  const threshold = state.scenarios ? state.scenarios.reroute_threshold : 999;
+
+  // 1. Lane routes (drawn first, under the chokepoint markers). When a
+  //    chokepoint is selected, lanes that DON'T use it are dimmed.
+  state.lane_order.forEach(lane => {
+    const r = state.results[lane];
+    const geo = LANE_GEO[lane];
+    // Diversion: if any corridor chokepoint is too disrupted to transit, draw
+    // the Cape route and relabel — matching the reroute premium in the cost.
+    const avoided = geo.via.filter(cp => (tension[cp] ?? 0) >= threshold);
+    const diverting = avoided.length > 0 && geo.cape;
+    const path = diverting ? geo.cape : geo.route;
+    const viaTxt = diverting
+      ? `diverting via Cape of Good Hope (avoiding ${avoided.join(", ")})`
+      : (geo.via.length ? `via ${geo.via.join(", ")}` : "open ocean");
+    const dest = path[path.length - 1];
+    const hot = selectedChoke && geo.via.includes(selectedChoke);
+    const dim = selectedChoke && !geo.via.includes(selectedChoke);
+    const col = riskColor(r.risk_score);
+
+    g.append("path").attr("class", "arc" + (dim ? " dim" : "") + (hot ? " hot" : ""))
+      .attr("d", geoPath(waterRoute(path)))
+      .attr("stroke", col)
+      .style("cursor", "pointer")
+      .on("mousemove", e => showTip(
+        `<b>${geo.name}</b><br>Risk ${r.risk_score} (${r.band})<br>` +
+        `Cost-to-serve €${r.landed.total_eur.toLocaleString("en-US")}/container<br>${viaTxt}`, e))
+      .on("mouseleave", hideTip);
+    const origin = path[0];
+
+    [origin, dest].forEach(coord => {
+      const [x, y] = projection(coord);
+      g.append("circle").attr("class", "node")
+        .attr("cx", x).attr("cy", y).attr("r", 4.5).attr("fill", col)
+        .attr("opacity", dim ? 0.2 : 1);
+    });
+
+    const [tx, ty] = projection(dest);
+    g.append("text").attr("class", "map-score")
+      .attr("x", tx + 8).attr("y", ty - 8)
+      .attr("fill", col).attr("font-size", 13)
+      .attr("opacity", dim ? 0.2 : 1)
+      .text(r.risk_score);
+
+    legend.append("div").attr("class", "item").html(
+      `<span class="dot" style="background:${col}"></span>${geo.name}: ${r.risk_score} (${r.band}) · ${viaTxt}`);
+  });
+
+  // 2. Chokepoint markers (on top), coloured by live tension. Hover for detail;
+  //    click to highlight only the lanes that transit it (click again to clear).
+  (state.scenarios && state.scenarios.chokepoints || []).forEach(cp => {
+    const [x, y] = projection([cp.lon, cp.lat]);
+    const lanes = lanesThrough(cp.name);
+    g.append("rect").attr("class", "choke" + (selectedChoke === cp.name ? " sel" : ""))
+      .attr("x", x - 3.5).attr("y", y - 3.5).attr("width", 7).attr("height", 7)
+      .attr("transform", `rotate(45 ${x} ${y})`)
+      .attr("fill", tensionColor(cp.tension))
+      .on("mousemove", e => showTip(
+        `<b>${cp.name}</b> · tension ${cp.tension}/100<br>` +
+        `Lanes through here: ${lanes.join(", ") || "none of ours"}`, e))
+      .on("mouseleave", hideTip)
+      .on("click", () => { selectedChoke = selectedChoke === cp.name ? null : cp.name; renderMap(state); });
+    g.append("text").attr("class", "choke-label")
+      .attr("x", x).attr("y", y - 7).attr("text-anchor", "middle")
+      .text(`${cp.name} ${cp.tension}`);
+  });
+
+  // Selection hint in the legend.
+  legend.append("div").attr("class", "item").style("color", "var(--muted)").html(
+    selectedChoke
+      ? `Highlighting lanes via <b style="color:var(--text)">${selectedChoke}</b> — click it again to clear`
+      : `Tip: hover a lane for detail · click a chokepoint to highlight the lanes through it`);
+}
+
+const eur = n => "€" + (n ?? 0).toLocaleString("en-US");
+
+function renderReco(state) {
+  const rec = state.recommendation;
+  document.getElementById("reco-host").innerHTML = `
+    <div class="section-title">Cost-to-serve monitor</div>
+    <div class="reco">
+      <div class="lead">Cost-to-serve spread across your lanes today</div>
+      <div class="headline">${rec.market} leanest (${eur(rec.total_eur)}) · ${rec.priciest_market} heaviest (${eur(rec.priciest_total_eur)})</div>
+      <div class="detail"><b>${eur(rec.spread_eur)}</b> spread per container. Use it for pricing, surcharge timing, FX hedging and inventory pre-positioning on existing markets — not as a "which country to sell to" call.</div>
+    </div>`;
+}
+
+function renderBacktest(state) {
+  const bt = state.backtest;
+  const host = document.getElementById("bt-host");
+  if (!bt || !bt.ok) {
+    host.innerHTML = `<div class="section-title">Validation · backtest</div>
+      <div class="bt"><div class="note">Not enough history yet (${bt ? bt.days : 0} days). Builds as the monitor runs daily.</div></div>`;
+    return;
+  }
+  const fxRows = Object.entries(bt.fx_moves).map(([lane, mv]) => {
+    const cls = mv.eur_impact < 0 ? "neg" : "pos";
+    const market = state.results[lane].market;
+    return `<div class="row"><span>${market} · EUR/${state.results[lane].currency} ${mv.pct>0?'+':''}${mv.pct}%</span>
+      <b class="${cls}">€${mv.eur_impact>0?'+':''}${mv.eur_impact.toLocaleString('en-US')}/container</b></div>`;
+  }).join("");
+  const costRows = Object.entries(bt.avg_cost_eur).map(([lane, avg]) => {
+    const [lo,hi] = bt.cost_range_eur[lane];
+    return `<div class="row"><span>${state.results[lane].market}</span>
+      <b>€${avg.toLocaleString('en-US')} <span style="color:var(--muted)">(€${lo.toLocaleString('en-US')}–€${hi.toLocaleString('en-US')})</span></b></div>`;
+  }).join("");
+  host.innerHTML = `
+    <div class="section-title">Validation · backtest</div>
+    <div class="bt">
+      <div class="hl">Over <b>${bt.days}</b> days, <b>${bt.winner_market}</b> had the lowest cost-to-serve on
+        <b>${bt.cheapest_share_pct}%</b> of days — cheaper than the runner-up (${bt.runner_up_market}) by
+        ~<b>€${bt.winner_vs_runnerup_eur.toLocaleString('en-US')}</b>/container, with
+        <b>${bt.ranges_disjoint ? 'non-overlapping' : 'overlapping'}</b> cost ranges
+        ${bt.ranges_disjoint ? '(below it on every single day, not noise).' : '(treat the lead as within daily noise).'}</div>
+      <div class="grid">
+        <div><div class="row" style="color:var(--text);border:none"><b>Avg landed cost (range)</b></div>${costRows}</div>
+        <div><div class="row" style="color:var(--text);border:none"><b>FX margin move over window</b></div>${fxRows}</div>
+      </div>
+      <div class="note">Reconstructed on the same basis as the live cards (baseline tensions, so feedstock + reroute are in both). Validates the cost model; news sentiment &amp; blended risk accrue forward.</div>
+    </div>`;
+}
+
+function bar(label, val, color) {
+  return `<div class="bar-row"><span>${label}</span>
+    <span class="track"><span class="fill" style="width:${val}%;background:${color}"></span></span>
+    <span class="bar-val">${val}</span></div>`;
+}
+
+function renderCards(state) {
+  const host = document.getElementById("cards");
+  host.innerHTML = "";
+  state.lane_order.forEach(lane => {
+    const r = state.results[lane];
+    const s = r.subscores, m = r.metrics;
+    const col = riskColor(r.risk_score);
+    const card = document.createElement("div");
+    card.className = "card";
+    card.style.borderTopColor = col;
+    card.innerHTML = `
+      <h3>${r.label}</h3>
+      <div class="ccy">${r.market} · FX EUR/${r.currency} · ${r.policy}</div>
+      <div class="score-row">
+        <span class="score" style="color:${col}">${r.risk_score}</span>
+        <span class="band" style="background:${col}22;color:${col}">${r.band}</span>
+      </div>
+      <div class="bars">
+        ${bar("FX vol · 30%", s.fx_volatility.score, col)}
+        ${bar("Fuel · 20%", s.fuel_cost.score, col)}
+        ${bar("News · 20%", s.news_sentiment.score, col)}
+        ${bar("Chokepoint · 30%", s.chokepoint.score, col)}
+      </div>
+      <div class="cost">
+        <div class="lbl">Est. landed cost / container</div>
+        <div class="big">${eur(r.landed.total_eur)}</div>
+        <div class="bd">
+          freight ${eur(r.landed.breakdown.freight)} · bunker ${eur(r.landed.breakdown.bunker)} ·
+          <span class="${r.landed.breakdown.tariff ? 'tar' : ''}">tariff ${eur(r.landed.breakdown.tariff)}</span>
+          ${r.landed.breakdown.reroute ? `· <span class="tar">Cape reroute ${eur(r.landed.breakdown.reroute)}</span>` : ''}
+          ${r.landed.breakdown.feedstock ? `· feedstock ${eur(r.landed.breakdown.feedstock)}` : ''}
+          ${r.landed.fx_margin_headwind_pct != null
+            ? `· FX 30d ${r.landed.fx_margin_headwind_pct > 0 ? 'headwind' : 'tailwind'} ${Math.abs(r.landed.fx_margin_headwind_pct)}%`
+            : ''}
+        </div>
+      </div>
+      <div class="metrics">
+        <span>EUR/${r.currency} <b>${m.fx_rate ?? "–"}</b></span>
+        <span>Brent <b>$${m.oil_price ?? "–"}</b></span>
+        <span>Container <b>${eur(m.container_freight_eur)}</b></span>
+      </div>
+      <div class="chart-box"><canvas id="chart-${lane}"></canvas></div>`;
+    host.appendChild(card);
+  });
+  state.lane_order.forEach(lane => renderChart(lane, state.trends[lane], state.results[lane].color));
+}
+
+function rebase(series) {
+  // Rebase a series to 100 at its first non-null value, so FX / freight / oil
+  // (very different absolute scales) can share one axis and show % movement.
+  const base = series.find(v => v != null);
+  if (base == null) return series.map(() => null);
+  return series.map(v => v == null ? null : +(v / base * 100).toFixed(2));
+}
+
+function renderChart(lane, t, color) {
+  if (chartRegistry[lane]) chartRegistry[lane].destroy();
+  const ctx = document.getElementById("chart-" + lane);
+  const labels = t.dates.map(d => d.slice(5)); // MM-DD
+  chartRegistry[lane] = new Chart(ctx, {
+    type: "line",
+    data: {
+      labels,
+      datasets: [
+        { label: "FX (rebased)",  data: rebase(t.fx_rate),   borderColor: color,     borderWidth: 2, pointRadius: 0, tension: .25 },
+        { label: "Oil (rebased)", data: rebase(t.oil_price), borderColor: "#5b6b86", borderWidth: 1.2, borderDash: [4,3], pointRadius: 0, tension: .25 },
+      ]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { display: false } },
+      scales: {
+        x: { ticks: { color: "#5b6b86", maxTicksLimit: 5, font: { size: 9 } }, grid: { display: false } },
+        y: { ticks: { color: "#5b6b86", font: { size: 9 } }, grid: { color: "#1c2535" } }
+      }
+    }
+  });
+}
+
+function render(state) {
+  document.getElementById("subtitle").textContent =
+    "Live FX · Brent · news  ·  " + new Date().toLocaleString();
+  renderScenarios(state);
+  renderMap(state);
+  renderReco(state);
+  renderCards(state);
+  renderBacktest(state);
+  document.getElementById("briefing").textContent = state.briefing;
+}
+
+async function load(refresh) {
+  const btn = document.getElementById("refresh");
+  btn.disabled = true; btn.textContent = "↻ Loading…";
+  try {
+    const base = refresh ? "/api/refresh" : "/api/state";
+    const url = base + "?scenario=" + encodeURIComponent(currentScenario);
+    const state = await fetch(url, { method: refresh ? "POST" : "GET" }).then(r => r.json());
+    render(state);
+  } catch (e) {
+    document.getElementById("subtitle").textContent = "Error loading data: " + e;
+  } finally {
+    btn.disabled = false; btn.textContent = "↻ Refresh data";
+  }
+}
+
+document.getElementById("refresh").addEventListener("click", () => load(true));
+
+// Boot: draw the static world once, then load the live state onto it.
+drawWorld().then(() => load(false));
+</script>
+</body>
+</html>

@@ -1,0 +1,17 @@
+# One-click deploy config for Render (https://render.com — free tier).
+# In Render: New > Blueprint > point at this repo. It reads this file.
+# Keys are optional (the app falls back to free sources); add them in the
+# Render dashboard if you have them.
+services:
+  - type: web
+    name: trade-lane-monitor
+    runtime: python
+    plan: free
+    buildCommand: pip install -r requirements.txt
+    # 1 worker so the in-memory state cache is shared across requests.
+    startCommand: gunicorn app:app --bind 0.0.0.0:$PORT --workers 1 --timeout 120
+    envVars:
+      - key: EIA_API_KEY
+        sync: false
+      - key: NEWSAPI_KEY
+        sync: false
