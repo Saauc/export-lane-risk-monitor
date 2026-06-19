@@ -4,7 +4,9 @@
 
 > Modelled on a real-world use case: a **Spanish specialty-coatings exporter** shipping from Barcelona into seven global markets. Coatings are a useful example because they're **petroleum-derived** (so oil shocks hit both raw-material and freight cost) and ship as **regulated container cargo** — but the engine is industry-agnostic and retargets to any exporter via one line in `config.json`.
 
-![screenshot](docs/screenshot.png) <!-- TODO: drop a screenshot of the dashboard here -->
+![Export Lane Risk Monitor — live lane-risk map](docs/screenshot.png)
+
+<sub>Live dashboard: seven export lanes from Barcelona, colour-coded green→red by risk. The Red Sea lanes (Australia, China) divert around the Cape of Good Hope because Bab-el-Mandeb is disrupted — the map, labels and reroute cost all agree.</sub>
 
 ---
 
@@ -69,6 +71,10 @@ The **scenario selector** recomputes everything live:
 
 - **Red Sea closure** → Australia & China exposure and reroute cost climb further; Atlantic lanes untouched.
 - **Hormuz crisis (oil)** → cost rises on *all seven* lanes via the feedstock/fuel channel.
+
+![Stress scenario — Red Sea closure](docs/stress-red-sea.png)
+
+<sub>Flipping to a "Red Sea closure" scenario recomputes every lane's risk and cost in place — the Asia-Pacific lanes redden and their reroute premium rises, while the Atlantic lanes are unaffected.</sub>
 
 ## Validation / backtest
 
