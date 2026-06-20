@@ -153,4 +153,4 @@ Python · Flask · gunicorn · SQLite (stdlib) · D3 + TopoJSON (map) · Chart.j
 
 ## License
 
-_(TODO — pick a license, e.g. MIT.)_
+MIT — see [LICENSE](LICENSE).
