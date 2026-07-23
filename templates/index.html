@@ -60,6 +60,9 @@
     #refresh:disabled { opacity: .5; cursor: default; }
 
     .section-title { font-size: 11.5px; text-transform: uppercase; letter-spacing: 1.6px; color: var(--muted); font-weight: 600; margin: 34px 0 14px; }
+    .plain-summary { background: var(--panel); border: 1px solid var(--border); border-left: 3px solid var(--accent);
+      border-radius: var(--radius); padding: 16px 20px; margin-top: 18px; font-size: 15px; line-height: 1.55; }
+    .plain-summary .eyebrow { font-size: 11px; text-transform: uppercase; letter-spacing: 1px; color: var(--muted); margin-bottom: 5px; }
 
     /* ---- Recommendation banner ---- */
     .reco { background: linear-gradient(135deg, #0f2c1e, #131a26 70%); border: 1px solid #1d4d36;
@@ -143,6 +146,9 @@
     .score-row { display: flex; align-items: baseline; gap: 11px; margin: 16px 0 2px; }
     .score { font-size: 46px; font-weight: 800; line-height: .9; letter-spacing: -2px; }
     .band { font-size: 10.5px; font-weight: 600; padding: 4px 10px; border-radius: 20px; text-transform: uppercase; letter-spacing: .5px; }
+    .spark-row { display: flex; align-items: center; gap: 8px; margin: 2px 0 14px; }
+    .spark-row canvas { width: 100px; height: 26px; }
+    .spark-label { font-size: 10.5px; color: var(--muted); white-space: nowrap; }
     .bars { margin: 18px 0 4px; }
     .bar-row { display: grid; grid-template-columns: 100px 1fr 30px; align-items: center; gap: 9px; margin: 8px 0; font-size: 11.5px; color: var(--muted); }
     .track { height: 6px; background: var(--panel-2); border-radius: 6px; overflow: hidden; }
@@ -181,6 +187,11 @@
       </div>
       <button id="refresh">↻ Refresh data</button>
     </header>
+
+    <div class="plain-summary" id="plainSummary">
+      <div class="eyebrow">In plain terms</div>
+      <div id="plainSummaryText">Loading…</div>
+    </div>
 
     <div class="section-title">Lane risk map</div>
     <div class="scenario-bar" id="scenario-host"></div>
@@ -496,6 +507,10 @@ function renderCards(state) {
         <span class="score" style="color:${col}">${r.risk_score}</span>
         <span class="band" style="background:${col}22;color:${col}">${r.band}</span>
       </div>
+      <div class="spark-row">
+        <canvas id="spark-${lane}" width="100" height="26"></canvas>
+        <span class="spark-label" id="spark-label-${lane}"></span>
+      </div>
       <div class="bars">
         ${bar("FX vol · 30%", s.fx_volatility.score, col)}
         ${bar("Fuel · 20%", s.fuel_cost.score, col)}
@@ -531,7 +546,36 @@ function renderCards(state) {
       <div class="chart-box"><canvas id="chart-${lane}"></canvas></div>`;
     host.appendChild(card);
   });
-  state.lane_order.forEach(lane => renderChart(lane, state.trends[lane], state.results[lane].color));
+  state.lane_order.forEach(lane => {
+    renderChart(lane, state.trends[lane], state.results[lane].color);
+    renderRiskSpark(lane, state.trends[lane]);
+  });
+}
+
+// Small per-lane sparkline of the risk_score trend (last ~30 obs). Answers
+// "how has THIS lane's risk moved," which the FX/oil chart doesn't show —
+// risk_score has its own weighted formula, it isn't just FX and oil.
+function renderRiskSpark(lane, t) {
+  const canvas = document.getElementById("spark-" + lane);
+  const label = document.getElementById("spark-label-" + lane);
+  const scores = (t.risk_score || []).filter(v => v != null);
+  if (scores.length < 2) { label.textContent = "risk trend: n/a"; return; }
+  const ctx = canvas.getContext("2d");
+  const w = canvas.width, h = canvas.height, pad = 2;
+  const lo = Math.min(...scores), hi = Math.max(...scores);
+  const span = Math.max(1, hi - lo);
+  const x = i => pad + (i / (scores.length - 1)) * (w - 2 * pad);
+  const y = v => h - pad - ((v - lo) / span) * (h - 2 * pad);
+  ctx.clearRect(0, 0, w, h);
+  ctx.beginPath();
+  scores.forEach((v, i) => i === 0 ? ctx.moveTo(x(i), y(v)) : ctx.lineTo(x(i), y(v)));
+  ctx.strokeStyle = riskColor(scores[scores.length - 1]);
+  ctx.lineWidth = 1.6;
+  ctx.stroke();
+  const first = scores[0], last = scores[scores.length - 1];
+  const delta = +(last - first).toFixed(1);
+  const arrow = delta > 0.5 ? "▲" : delta < -0.5 ? "▼" : "→";
+  label.textContent = `${arrow} risk ${delta >= 0 ? "+" : ""}${delta} / ${scores.length}d`;
 }
 
 function rebase(series) {
@@ -566,9 +610,41 @@ function renderChart(lane, t, color) {
   });
 }
 
+// One-sentence, ops-readable takeaway: overall risk level across lanes, the
+// lane carrying the most exposure, and — when a stress scenario is active —
+// what that scenario is doing to it. No scores/jargon, just the read.
+function renderSummary(state) {
+  const el = document.getElementById("plainSummaryText");
+  const lanes = state.lane_order.map(l => state.results[l]);
+  if (!lanes.length) { el.textContent = "No lane data available."; return; }
+
+  const avg = lanes.reduce((s, r) => s + r.risk_score, 0) / lanes.length;
+  const overallBand = avg <= 30 ? "low" : avg <= 45 ? "moderate" : avg <= 62 ? "elevated" : "high";
+  const worst = lanes.reduce((a, b) => (b.risk_score > a.risk_score ? b : a));
+  const best = lanes.reduce((a, b) => (b.risk_score < a.risk_score ? b : a));
+
+  const scenario = state.scenarios && state.scenarios.active;
+  const scenarioLabel = (state.scenarios && state.scenarios.options || [])
+    .find(s => s.key === scenario)?.label;
+  const scenarioTxt = scenario && scenario !== "baseline" && scenarioLabel
+    ? ` Under the "${scenarioLabel}" scenario, ` : " ";
+
+  let sentence = `Baseline risk is ${overallBand} across the ${lanes.length} monitored lane${lanes.length > 1 ? "s" : ""}.`;
+  sentence += `${scenarioTxt}${worst.label} carries the most exposure at ${worst.risk_score} (${worst.band})`;
+  if (best.label !== worst.label) {
+    sentence += `, while ${best.label} is the calmest at ${best.risk_score} (${best.band}).`;
+  } else {
+    sentence += ".";
+  }
+  const alerts = (state.alerts || []).length;
+  if (alerts > 0) sentence += ` ${alerts} lane${alerts > 1 ? "s" : ""} moved enough to trigger an alert since yesterday.`;
+  el.textContent = sentence;
+}
+
 function render(state) {
   document.getElementById("subtitle").textContent =
     "Live FX · Brent · news  ·  " + new Date().toLocaleString();
+  renderSummary(state);
   renderScenarios(state);
   renderMap(state);
   renderReco(state);
