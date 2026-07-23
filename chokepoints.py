@@ -37,6 +37,26 @@ def resolve_tensions(cfg: dict, scenario_key: str = "baseline") -> dict[str, int
     return tensions
 
 
+def resolve_custom_tensions(cfg: dict, severity: float) -> dict[str, int]:
+    """
+    Continuous alternative to a named scenario: interpolate every chokepoint's
+    tension from baseline (severity=0) toward the combined worst case of ALL
+    configured stress scenarios merged together (severity=100). Backs the
+    dashboard's disruption-severity slider — one knob standing in for "how bad
+    is the climate right now", rather than picking one canned scenario.
+    """
+    points = cfg["chokepoints"]["points"]
+    baseline = {name: p["tension"] for name, p in points.items()}
+    worst = dict(baseline)
+    for key, scen in cfg.get("scenarios", {}).items():
+        if key.startswith("_") or not isinstance(scen, dict):
+            continue
+        worst.update(scen.get("overrides", {}))
+    frac = max(0.0, min(100.0, severity)) / 100.0
+    return {name: round(baseline[name] + (worst.get(name, baseline[name]) - baseline[name]) * frac)
+            for name in baseline}
+
+
 def lane_chokepoint_subscore(lane_key: str, tensions: dict[str, int]) -> dict:
     """
     0-100 chokepoint-exposure sub-score for one lane, using a NOISY-OR over the

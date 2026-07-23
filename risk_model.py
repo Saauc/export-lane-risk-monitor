@@ -325,7 +325,8 @@ def score_lane(lane_key: str, bundle: dict, cfg: dict,
 
 
 def score_all_lanes(bundle: dict | None = None, persist: bool = True,
-                    scenario: str = "baseline") -> dict:
+                    scenario: str = "baseline",
+                    tensions: dict[str, int] | None = None) -> dict:
     """
     Score every lane under the given `scenario` (a key into config.scenarios that
     sets chokepoint tensions) and optionally persist today's snapshot.
@@ -334,9 +335,14 @@ def score_all_lanes(bundle: dict | None = None, persist: bool = True,
     fetches live. We request extra FX history (120 days) because volatility math
     needs a baseline longer than the 30-day window itself. We only persist the
     'baseline' scenario — hypothetical stress runs shouldn't pollute the history.
+
+    Pass `tensions` directly to bypass config-scenario lookup entirely (used by
+    the dashboard's custom disruption-severity slider, which isn't a named
+    scenario in config.json).
     """
     cfg = load_config()
-    tensions = chokepoints.resolve_tensions(cfg, scenario)
+    if tensions is None:
+        tensions = chokepoints.resolve_tensions(cfg, scenario)
 
     if bundle is None:
         bundle = {

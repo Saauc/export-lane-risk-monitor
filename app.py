@@ -50,18 +50,21 @@ _bundle_cache: dict | None = None
 _state_cache: dict[str, dict] = {}
 
 
-def _scenarios_payload(cfg: dict, active: str) -> dict:
+def _scenarios_payload(cfg: dict, active: str, tensions: dict[str, int]) -> dict:
     """List of selectable scenarios + the resolved chokepoint tensions for the
-    active one (so the map can colour the chokepoint markers)."""
+    active one (so the map can colour the chokepoint markers). `tensions` is
+    passed in rather than re-resolved here, since the caller already computed
+    it (and "custom" isn't a lookup key in config.scenarios at all)."""
     scen = cfg.get("scenarios", {})
     points = cfg["chokepoints"]["points"]
-    tensions = chokepoints.resolve_tensions(cfg, active)
+    # skip the "_comment" doc key — only real scenario entries have a label.
+    options = [{"key": k, "label": v["label"]}
+               for k, v in scen.items() if not k.startswith("_")]
+    options.append({"key": "custom", "label": "Custom disruption"})
     return {
         "active": active,
         "reroute_threshold": cfg["chokepoints"]["reroute_threshold"],
-        # skip the "_comment" doc key — only real scenario entries have a label.
-        "options": [{"key": k, "label": v["label"]}
-                    for k, v in scen.items() if not k.startswith("_")],
+        "options": options,
         "chokepoints": [
             {"name": name, "lon": p["lon"], "lat": p["lat"], "tension": tensions[name]}
             for name, p in points.items()
@@ -69,14 +72,18 @@ def _scenarios_payload(cfg: dict, active: str) -> dict:
     }
 
 
-def _build_state(refresh: bool = False, scenario: str = "baseline") -> dict:
+def _build_state(refresh: bool = False, scenario: str = "baseline",
+                 severity: int | None = None) -> dict:
     """
     Compute (or return cached) the dashboard payload for a given stress scenario.
-    The live data bundle is fetched once and shared across scenarios.
+    The live data bundle is fetched once and shared across scenarios. When
+    `scenario` is "custom", `severity` (0-100) drives a continuous blend between
+    baseline and worst-case tensions instead of a named config scenario.
     """
     global _bundle_cache, _state_cache
-    if not refresh and scenario in _state_cache:
-        return _state_cache[scenario]
+    cache_key = scenario if scenario != "custom" else f"custom:{severity}"
+    if not refresh and cache_key in _state_cache:
+        return _state_cache[cache_key]
 
     cfg = risk_model.load_config()
 
@@ -89,9 +96,17 @@ def _build_state(refresh: bool = False, scenario: str = "baseline") -> dict:
         }
         _state_cache = {}  # bundle changed -> drop stale per-scenario states
 
+    if scenario == "custom":
+        tensions = chokepoints.resolve_custom_tensions(cfg, severity)
+        scenario_label = f"Custom disruption ({severity}%)"
+    else:
+        tensions = chokepoints.resolve_tensions(cfg, scenario)
+        scenario_label = cfg.get("scenarios", {}).get(scenario, {}).get("label")
+
     # Score under this scenario; only the baseline persists to the DB.
     results = risk_model.score_all_lanes(
-        bundle=_bundle_cache, persist=(scenario == "baseline"), scenario=scenario)
+        bundle=_bundle_cache, persist=(scenario == "baseline"),
+        scenario=scenario, tensions=tensions)
 
     # 30-day trend series + yesterday's snapshot (for alerts) from SQLite.
     trends = {}
@@ -125,27 +140,38 @@ def _build_state(refresh: bool = False, scenario: str = "baseline") -> dict:
     # Alerts: only meaningful on the baseline (stress scenarios don't have history).
     lane_alerts = alerts.check_alerts(results, prev_snapshots, cfg) if scenario == "baseline" else []
 
-    _state_cache[scenario] = {
+    _state_cache[cache_key] = {
         "results": results,
         "trends": trends,
         "ranking": ranking,
         "recommendation": recommendation,
         "alerts": lane_alerts,
         "backtest": backtest.run_backtest(),
-        "briefing": briefing.generate_briefing(
-            results,
-            scenario_label=cfg.get("scenarios", {}).get(scenario, {}).get("label")),
-        "scenarios": _scenarios_payload(cfg, scenario),
+        "briefing": briefing.generate_briefing(results, scenario_label=scenario_label),
+        "scenarios": _scenarios_payload(cfg, scenario, tensions),
         "lane_order": list(data_sources.LANES.keys()),
+        "severity": severity if scenario == "custom" else None,
     }
-    return _state_cache[scenario]
+    return _state_cache[cache_key]
 
 
 def _scenario_arg(default: str = "baseline") -> str:
-    """Read & validate the ?scenario= query param against config."""
+    """Read & validate the ?scenario= query param against config. "custom" is
+    always allowed — it's the slider mode and isn't a config.scenarios key."""
     cfg = risk_model.load_config()
     requested = request.args.get("scenario", default)
-    return requested if requested in cfg.get("scenarios", {}) else default
+    if requested == "custom" or requested in cfg.get("scenarios", {}):
+        return requested
+    return default
+
+
+def _severity_arg(default: int = 50) -> int:
+    """Read & clamp the ?severity= query param (0-100) for custom scenario mode."""
+    try:
+        value = int(request.args.get("severity", default))
+    except (TypeError, ValueError):
+        value = default
+    return max(0, min(100, value))
 
 
 @app.route("/")
@@ -157,13 +183,17 @@ def index():
 @app.route("/api/state")
 def api_state():
     """Return cached (or first-computed) state for the requested scenario."""
-    return jsonify(_build_state(refresh=False, scenario=_scenario_arg()))
+    scenario = _scenario_arg()
+    severity = _severity_arg() if scenario == "custom" else None
+    return jsonify(_build_state(refresh=False, scenario=scenario, severity=severity))
 
 
 @app.route("/api/refresh", methods=["POST"])
 def api_refresh():
     """Force a fresh live pipeline run and return the new state."""
-    return jsonify(_build_state(refresh=True, scenario=_scenario_arg()))
+    scenario = _scenario_arg()
+    severity = _severity_arg() if scenario == "custom" else None
+    return jsonify(_build_state(refresh=True, scenario=scenario, severity=severity))
 
 
 if __name__ == "__main__":

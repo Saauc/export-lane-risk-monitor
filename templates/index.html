@@ -105,6 +105,10 @@
     .scen-btn { background: var(--panel-2); color: var(--text); border: 1px solid var(--border); padding: 7px 15px; border-radius: 999px; cursor: pointer; font-size: 12px; font-weight: 500; font-family: inherit; transition: all .15s; }
     .scen-btn:hover { border-color: var(--accent); color: var(--accent); }
     .scen-btn.on { background: var(--accent); color: #06121c; border-color: var(--accent); font-weight: 600; box-shadow: 0 4px 14px rgba(56,189,248,.25); }
+    .severity-row { display: none; align-items: center; gap: 10px; width: 100%; margin-top: 2px; }
+    .severity-row.on { display: flex; }
+    .severity-row input[type=range] { flex: 1; max-width: 320px; accent-color: var(--accent); cursor: pointer; }
+    .severity-row .sev-val { font-size: 12px; font-weight: 700; color: var(--accent); min-width: 34px; }
 
     /* ---- Hero map ---- */
     .map-panel { background: linear-gradient(180deg, #131a26, #0f1520); border: 1px solid var(--border); border-radius: 14px; padding: 8px; overflow: hidden; box-shadow: 0 8px 30px rgba(0,0,0,.35); }
@@ -195,6 +199,11 @@
 
     <div class="section-title">Lane risk map</div>
     <div class="scenario-bar" id="scenario-host"></div>
+    <div class="severity-row" id="severity-host">
+      <span class="scen-label">Disruption severity:</span>
+      <input type="range" id="severity-slider" min="0" max="100" step="1" value="50">
+      <span class="sev-val" id="severity-val">50%</span>
+    </div>
     <div class="map-panel">
       <svg id="map" viewBox="0 0 960 440" preserveAspectRatio="xMidYMid meet"></svg>
       <div class="map-legend scales">
@@ -291,6 +300,8 @@ const geoPath = d3.geoPath(projection);
 
 let chartRegistry = {}; // keep Chart.js instances so we can destroy on refresh
 let currentScenario = "baseline"; // active stress scenario
+let currentSeverity = 50;          // active custom-scenario severity (0-100)
+let severityDebounce = null;
 
 function renderScenarios(state) {
   const host = document.getElementById("scenario-host");
@@ -301,7 +312,21 @@ function renderScenarios(state) {
     ).join("");
   host.querySelectorAll(".scen-btn").forEach(b =>
     b.addEventListener("click", () => { currentScenario = b.dataset.scen; load(false); }));
+
+  const sevRow = document.getElementById("severity-host");
+  sevRow.classList.toggle("on", state.scenarios.active === "custom");
+  if (typeof state.severity === "number") currentSeverity = state.severity;
+  document.getElementById("severity-slider").value = currentSeverity;
+  document.getElementById("severity-val").textContent = currentSeverity + "%";
 }
+
+document.getElementById("severity-slider").addEventListener("input", (e) => {
+  currentSeverity = Number(e.target.value);
+  document.getElementById("severity-val").textContent = currentSeverity + "%";
+  // Debounce so dragging doesn't fire a request per pixel of travel.
+  clearTimeout(severityDebounce);
+  severityDebounce = setTimeout(() => load(false), 150);
+});
 
 async function drawWorld() {
   // world-atlas 110m: small TopoJSON of country borders, no key needed.
@@ -659,7 +684,8 @@ async function load(refresh) {
   btn.disabled = true; btn.textContent = "↻ Loading…";
   try {
     const base = refresh ? "/api/refresh" : "/api/state";
-    const url = base + "?scenario=" + encodeURIComponent(currentScenario);
+    let url = base + "?scenario=" + encodeURIComponent(currentScenario);
+    if (currentScenario === "custom") url += "&severity=" + currentSeverity;
     const state = await fetch(url, { method: refresh ? "POST" : "GET" }).then(r => r.json());
     render(state);
   } catch (e) {
