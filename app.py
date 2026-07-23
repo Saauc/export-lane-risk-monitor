@@ -151,6 +151,11 @@ def _build_state(refresh: bool = False, scenario: str = "baseline",
         "scenarios": _scenarios_payload(cfg, scenario, tensions),
         "lane_order": list(data_sources.LANES.keys()),
         "severity": severity if scenario == "custom" else None,
+        # Exposed so the dashboard's weight-reweighting sliders can recompute
+        # risk_score/band client-side from the already-shipped per-lane
+        # subscores, without a round trip per drag.
+        "weights": cfg["weights"],
+        "risk_bands": cfg["risk_bands"],
     }
     return _state_cache[cache_key]
 
