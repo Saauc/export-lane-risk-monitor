@@ -47,7 +47,7 @@ REQUEST_TIMEOUT = 15
 # whole project (scoring, dashboard, briefing) shares one source of truth.
 LANES = {
     "US": {"label": "US · Miami",       "currency": "USD", "market": "United States",
-           "policy": "10% US tariff (Section 122, expires ~Jul 2026)",
+           "policy": "US tariff 10% (configurable input)",
            "chokepoints": ["Gibraltar"]},
     "MX": {"label": "Mexico · Veracruz", "currency": "MXN", "market": "Mexico",
            "policy": "EU–Mexico Global Agreement (modernised)",
@@ -59,7 +59,7 @@ LANES = {
            "policy": "EU–UK TCA (tariff-free, customs friction)",
            "chokepoints": ["Gibraltar"]},
     "BR": {"label": "Brazil · Santos",   "currency": "BRL", "market": "Brazil",
-           "policy": "EU–Mercosur (pending ratification)",
+           "policy": "MFN tariffs (EU–Mercosur deal not modelled)",
            "chokepoints": ["Gibraltar"]},
     "AU": {"label": "Australia · Sydney", "currency": "AUD", "market": "Australia",
            "policy": "No EU FTA (MFN tariffs)",

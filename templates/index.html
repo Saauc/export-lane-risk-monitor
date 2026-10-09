@@ -288,7 +288,7 @@
     <footer class="foot">
       Live data: frankfurter.app (FX), Yahoo Finance (Brent crude), Google News RSS.
       Container freight &amp; chokepoint tensions are configured estimates (Drewry/Freightos in production).
-      US Section 122 10% tariff is a real regime (eff. 24 Feb 2026, expires ~24 Jul 2026; under legal challenge).
+      Tariff rates are configurable inputs (e.g. US 10%), not a live legal feed.
       Cost figures are illustrative, not a freight quote or investment advice.
     </footer>
   </div>
@@ -634,7 +634,7 @@ function renderBacktest(state) {
     const cls = mv.eur_impact < 0 ? "neg" : "pos";
     const market = state.results[lane].market;
     return `<div class="row"><span>${market} · EUR/${state.results[lane].currency} ${mv.pct>0?'+':''}${mv.pct}%</span>
-      <b class="${cls}">€${mv.eur_impact>0?'+':''}${mv.eur_impact.toLocaleString('en-US')}/container</b></div>`;
+      <b class="${cls}">${mv.eur_impact>0?'+':mv.eur_impact<0?'−':''}€${Math.abs(mv.eur_impact).toLocaleString('en-US')}/container</b></div>`;
   }).join("");
   const costRows = Object.entries(bt.avg_cost_eur).map(([lane, avg]) => {
     const [lo,hi] = bt.cost_range_eur[lane];
@@ -765,7 +765,7 @@ function renderRiskSpark(lane, t) {
   const canvas = document.getElementById("spark-" + lane);
   const label = document.getElementById("spark-label-" + lane);
   const scores = (t.risk_score || []).filter(v => v != null);
-  if (scores.length < 2) { label.textContent = "risk trend: n/a"; return; }
+  if (scores.length < 2) { canvas.closest(".spark-row").style.display = "none"; return; }
   const ctx = canvas.getContext("2d");
   const w = canvas.width, h = canvas.height, pad = 2;
   const lo = Math.min(...scores), hi = Math.max(...scores);

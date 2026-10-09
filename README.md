@@ -52,7 +52,7 @@ goods value + container freight (lane-specific configured estimate)
             = total landed cost
 ```
 
-The **tariff term** is where trade policy becomes real money: the **real, live** US Section 122 10% tariff (eff. 24 Feb 2026, expires ~24 Jul 2026; under legal challenge) adds **€4,000** to a €40k container, while Canada (CETA) and Mexico (EU–Mexico agreement) land near zero.
+The **tariff term** is where trade policy becomes real money: the **US 10% tariff** input (configurable in `config.json`) adds **€4,000** to a €40k container, while Canada (CETA) and Mexico (EU–Mexico agreement) land near zero.
 
 ### Why not BDRY / a dry-bulk index?
 

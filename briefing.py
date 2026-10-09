@@ -42,7 +42,7 @@ def _driver_sentence(r: dict) -> str:
         intensity = "the main driver"
     else:
         intensity = "the most notable factor (though all inputs are subdued)"
-    return f"{top.capitalize()} is {intensity}."
+    return f"{top[0].upper() + top[1:]} is {intensity}."
 
 
 def briefing_for_lane(r: dict) -> str:
