@@ -13,6 +13,20 @@
 
 ---
 
+### Try it (no install)
+
+Open the [live demo](https://trade-lane-monitor.onrender.com) and:
+
+- **Stress-test a lane:** click *Red Sea closure*, or pick *Custom disruption*
+  and drag the severity slider. Australia and China re-route around the Cape of
+  Good Hope on the map and their cost-to-serve rises.
+- **Plug in your own prices:** edit the *Sell price / container* on any card;
+  gross margin recalculates instantly.
+- **Question the model:** open *Advanced* and re-weight the four risk signals;
+  lanes re-rank live.
+
+---
+
 ## What it does
 
 For each of seven markets shipped from Barcelona (US · Miami, Mexico · Veracruz, Canada · Montreal, UK · Felixstowe, Brazil · Santos, Australia · Sydney, China · Shanghai):
