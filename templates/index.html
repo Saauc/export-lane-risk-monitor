@@ -4,6 +4,14 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>{{ branding.title }}</title>
+  <meta name="description" content="Live landed-cost and risk monitor for 7 export lanes from Barcelona: FX, oil, news and maritime-chokepoint stress tests, with interactive scenarios.">
+  <meta property="og:title" content="Export Lane Risk Monitor">
+  <meta property="og:description" content="Live landed-cost and risk monitor for 7 export lanes from Barcelona: FX, oil, news and maritime-chokepoint stress tests, with interactive scenarios.">
+  <meta property="og:image" content="https://trade-lane-monitor.onrender.com/static/og-image.png">
+  <meta property="og:url" content="https://trade-lane-monitor.onrender.com/">
+  <meta property="og:type" content="website">
+  <meta name="twitter:card" content="summary_large_image">
+  <link rel="icon" href="/static/favicon.svg" type="image/svg+xml">
 
   <!-- Third-party libs from CDN (no build step, no keys):
        D3 + TopoJSON  -> the world map and great-circle lane arcs
@@ -203,6 +211,9 @@
     .briefing-note.on { display: block; }
     .loading { color: var(--muted); padding: 40px; text-align: center; }
     footer.foot { color: var(--muted); font-size: 11.5px; margin-top: 30px; text-align: center; }
+    footer.foot .credit { margin-top: 12px; font-size: 13px; color: var(--text); }
+    footer.foot a { color: var(--accent); text-decoration: none; }
+    footer.foot a:hover { text-decoration: underline; }
   </style>
 </head>
 <body>
@@ -277,7 +288,7 @@
     <div id="alerts-host"></div>
 
     <div class="section-title">Lanes</div>
-    <div class="cards" id="cards"><div class="loading">Fetching scores…</div></div>
+    <div class="cards" id="cards"><div class="loading">Loading live data. If the free server was asleep this can take ~30 seconds…</div></div>
 
     <div id="bt-host"></div>
 
@@ -290,6 +301,10 @@
       Container freight &amp; chokepoint tensions are configured estimates (Drewry/Freightos in production).
       Tariff rates are configurable inputs (e.g. US 10%), not a live legal feed.
       Cost figures are illustrative, not a freight quote or investment advice.
+      <div class="credit">
+        Built by <b>Saüc Vilà Gil</b> ·
+        <a href="https://github.com/Saauc/export-lane-risk-monitor" target="_blank" rel="noopener">Source code &amp; methodology on GitHub</a>
+      </div>
     </footer>
   </div>
 
