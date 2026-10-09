@@ -71,6 +71,11 @@
     .plain-summary { background: var(--panel); border: 1px solid var(--border); border-left: 3px solid var(--accent);
       border-radius: var(--radius); padding: 16px 20px; margin-top: 18px; font-size: 15px; line-height: 1.55; }
     .plain-summary .eyebrow { font-size: 11px; text-transform: uppercase; letter-spacing: 1px; color: var(--muted); margin-bottom: 5px; }
+    .kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px; margin-top: 14px; }
+    .kpi { background: var(--panel); border: 1px solid var(--border); border-radius: 12px; padding: 14px 16px; }
+    .kpi .k-label { font-size: 11px; text-transform: uppercase; letter-spacing: 1px; color: var(--muted); }
+    .kpi .k-value { font-size: 22px; font-weight: 800; letter-spacing: -.5px; margin-top: 4px; }
+    .kpi .k-sub { font-size: 12px; color: var(--muted); margin-top: 2px; }
 
     /* ---- Recommendation banner ---- */
     .reco { background: linear-gradient(135deg, #0f2c1e, #131a26 70%); border: 1px solid #1d4d36;
@@ -110,6 +115,11 @@
     .sellprice-input:focus { outline: none; border-color: var(--accent); }
 
     /* ---- Signal-weight sliders ---- */
+    details.advanced { margin-top: 14px; }
+    details.advanced > summary { cursor: pointer; color: var(--muted); font-size: 12.5px; padding: 6px 2px; list-style: none; }
+    details.advanced > summary::before { content: "▸ "; }
+    details.advanced[open] > summary::before { content: "▾ "; }
+    details.advanced > summary:hover { color: var(--accent); }
     .weights-panel { background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius);
                       padding: 14px 18px; margin-top: 14px; }
     .weights-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
@@ -125,8 +135,8 @@
     /* ---- Landed cost block on cards ---- */
     .cost { margin-top: 14px; padding-top: 13px; border-top: 1px solid var(--border); }
     .cost .big { font-size: 24px; font-weight: 800; letter-spacing: -.6px; }
-    .cost .lbl { color: var(--muted); font-size: 10px; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 2px; }
-    .cost .bd { color: var(--muted); font-size: 11px; margin-top: 7px; line-height: 1.65; }
+    .cost .lbl { color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 2px; }
+    .cost .bd { color: var(--muted); font-size: 12px; margin-top: 7px; line-height: 1.65; }
     .cost .bd .tar { color: #f59e0b; font-weight: 600; }
 
     /* ---- Scenario selector ---- */
@@ -170,16 +180,16 @@
     .scale .ends { color: var(--muted); font-size: 11px; }
 
     /* ---- Lane cards ---- */
-    .cards { display: grid; grid-template-columns: repeat(3, 1fr); gap: 18px; }
-    @media (max-width: 880px) { .cards { grid-template-columns: 1fr; } }
+    .cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 18px; }
+    .card { min-width: 0; }
     .card { background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius); padding: 20px 20px 18px;
             border-top: 3px solid var(--border); box-shadow: var(--shadow); transition: transform .16s ease, border-color .16s; }
     .card:hover { transform: translateY(-3px); }
     .card h3 { margin: 0 0 3px; font-size: 16px; font-weight: 700; letter-spacing: -.2px; }
-    .card .ccy { color: var(--muted); font-size: 11px; line-height: 1.5; }
+    .card .ccy { color: var(--muted); font-size: 12px; line-height: 1.5; }
     .score-row { display: flex; align-items: baseline; gap: 11px; margin: 16px 0 2px; }
     .score { font-size: 46px; font-weight: 800; line-height: .9; letter-spacing: -2px; }
-    .band { font-size: 10.5px; font-weight: 600; padding: 4px 10px; border-radius: 20px; text-transform: uppercase; letter-spacing: .5px; }
+    .band { font-size: 11px; font-weight: 600; padding: 4px 10px; border-radius: 20px; text-transform: uppercase; letter-spacing: .5px; }
     .spark-row { display: flex; align-items: center; gap: 8px; margin: 2px 0 14px; }
     .spark-row canvas { width: 100px; height: 26px; }
     .spark-label { font-size: 10.5px; color: var(--muted); white-space: nowrap; }
@@ -191,6 +201,11 @@
     .metrics { display: flex; gap: 14px; flex-wrap: wrap; margin-top: 14px; padding-top: 13px; border-top: 1px solid var(--border); font-size: 11.5px; color: var(--muted); }
     .metrics b { color: var(--text); font-weight: 600; }
     .chart-box { margin-top: 14px; height: 116px; }
+    details.card-more { margin-top: 12px; }
+    details.card-more > summary { cursor: pointer; font-size: 12px; color: var(--muted); list-style: none; }
+    details.card-more > summary::before { content: "▸ "; }
+    details.card-more[open] > summary::before { content: "▾ "; }
+    details.card-more > summary:hover { color: var(--accent); }
 
     /* ---- Backtest panel ---- */
     .bt { background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius); padding: 20px 22px; box-shadow: var(--shadow); }
@@ -200,7 +215,7 @@
     @media (max-width: 700px) { .bt .grid { grid-template-columns: 1fr; } }
     .bt .row { display: flex; justify-content: space-between; font-size: 12.5px; color: var(--muted); border-bottom: 1px solid var(--border); padding: 6px 0; }
     .bt .row b { color: var(--text); font-variant-numeric: tabular-nums; }
-    .bt .note { color: var(--muted); font-size: 11px; margin-top: 10px; font-style: italic; }
+    .bt .note { color: var(--muted); font-size: 12px; margin-top: 10px; font-style: italic; }
     .bt .pos { color: #22c55e; } .bt .neg { color: #ef4444; }
 
     /* ---- Briefing ---- */
@@ -233,6 +248,8 @@
       <div id="plainSummaryText">Loading…</div>
     </div>
 
+    <div class="kpis" id="kpi-host"></div>
+
     <div class="section-title">Lane risk map</div>
     <div class="scenario-bar" id="scenario-host"></div>
     <div class="severity-row" id="severity-host">
@@ -241,6 +258,21 @@
       <span class="sev-val" id="severity-val">50%</span>
     </div>
 
+    <div class="map-panel">
+      <svg id="map" viewBox="0 0 960 440" preserveAspectRatio="xMidYMid meet"></svg>
+      <div class="map-legend scales">
+        <span class="scale">Lane risk
+          <i class="grad" style="background:linear-gradient(90deg,#22c55e,#eab308,#ef4444)"></i>
+          <span class="ends">low → high</span></span>
+        <span class="scale">Chokepoint tension
+          <i class="dot" style="background:#22c55e"></i><i class="dot" style="background:#eab308"></i><i class="dot" style="background:#f97316"></i><i class="dot" style="background:#ef4444"></i>
+          <span class="ends">calm → crisis</span></span>
+      </div>
+      <div class="map-legend" id="legend"></div>
+    </div>
+
+    <details class="advanced">
+      <summary>Advanced · adjust how the risk score weighs each signal</summary>
     <div class="weights-panel">
       <div class="weights-head">
         <span class="scen-label">Signal weights — drag to see lanes re-rank live (normalized to 100%)</span>
@@ -269,19 +301,7 @@
         </div>
       </div>
     </div>
-
-    <div class="map-panel">
-      <svg id="map" viewBox="0 0 960 440" preserveAspectRatio="xMidYMid meet"></svg>
-      <div class="map-legend scales">
-        <span class="scale">Lane risk
-          <i class="grad" style="background:linear-gradient(90deg,#22c55e,#eab308,#ef4444)"></i>
-          <span class="ends">low → high</span></span>
-        <span class="scale">Chokepoint tension
-          <i class="dot" style="background:#22c55e"></i><i class="dot" style="background:#eab308"></i><i class="dot" style="background:#f97316"></i><i class="dot" style="background:#ef4444"></i>
-          <span class="ends">calm → crisis</span></span>
-      </div>
-      <div class="map-legend" id="legend"></div>
-    </div>
+    </details>
 
     <div id="reco-host"></div>
 
@@ -292,9 +312,11 @@
 
     <div id="bt-host"></div>
 
-    <div class="section-title">Daily briefing</div>
-    <div class="briefing-note" id="briefing-note">Generated under the default signal weights (30/20/20/30) — the sliders above don't regenerate this text.</div>
+    <details class="advanced">
+      <summary>Daily briefing (plain-text version, for email or Slack)</summary>
+    <div class="briefing-note" id="briefing-note">Generated under the default signal weights (30/20/20/30) — the weight sliders don't regenerate this text.</div>
     <div class="briefing" id="briefing-box"><pre id="briefing">…</pre></div>
+    </details>
 
     <footer class="foot">
       Live data: frankfurter.app (FX), Yahoo Finance (Brent crude), Google News RSS.
@@ -369,6 +391,7 @@ function riskColor(score) {
 const projection = d3.geoNaturalEarth1().scale(178).translate([480, 235]);
 const geoPath = d3.geoPath(projection);
 
+const openMore = new Set(); // lanes whose card 'Market data' toggle is open (survives re-render)
 let chartRegistry = {}; // keep Chart.js instances so we can destroy on refresh
 let currentScenario = "baseline"; // active stress scenario
 let currentSeverity = 50;          // active custom-scenario severity (0-100)
@@ -727,17 +750,27 @@ function renderCards(state) {
           value="${customSellPrice[lane] ?? ''}" step="100"></span>
       </div>
       ${marginRowHTML(lane)}
-      <div class="metrics">
-        <span>EUR/${r.currency} <b>${m.fx_rate ?? "–"}</b></span>
-        <span>Brent <b>$${m.oil_price ?? "–"}</b></span>
-        <span>Container <b>${eur(m.container_freight_eur)}</b></span>
-      </div>
-      <div class="chart-box"><canvas id="chart-${lane}"></canvas></div>`;
+      <details class="card-more" data-lane="${lane}"${openMore.has(lane) ? " open" : ""}>
+        <summary>Market data &amp; 30-day trend</summary>
+        <div class="metrics">
+          <span>EUR/${r.currency} <b>${m.fx_rate ?? "–"}</b></span>
+          <span>Brent <b>$${m.oil_price ?? "–"}</b></span>
+          <span>Container <b>${eur(m.container_freight_eur)}</b></span>
+        </div>
+        <div class="chart-box"><canvas id="chart-${lane}"></canvas></div>
+      </details>`;
     host.appendChild(card);
   });
   state.lane_order.forEach(lane => {
     renderChart(lane, state.trends[lane], state.results[lane].color);
     renderRiskSpark(lane, state.trends[lane]);
+  });
+  host.querySelectorAll("details.card-more").forEach(d => {
+    d.addEventListener("toggle", () => {
+      const ch = chartRegistry[d.dataset.lane];
+      if (d.open) { openMore.add(d.dataset.lane); if (ch) ch.resize(); }
+      else openMore.delete(d.dataset.lane);
+    });
   });
   host.querySelectorAll(".sellprice-input").forEach(inp => {
     inp.addEventListener("input", () => {
@@ -862,10 +895,33 @@ function renderSummary(state) {
   el.textContent = sentence;
 }
 
+function renderKpis(state) {
+  const host = document.getElementById("kpi-host");
+  const lanes = state.lane_order.map(l => state.results[l]);
+  if (!lanes.length) { host.innerHTML = ""; return; }
+  const worst = lanes.reduce((a, b) => (b.risk_score > a.risk_score ? b : a));
+  const rec = state.recommendation;
+  const brent = lanes[0].metrics.oil_price;
+  host.innerHTML = `
+    <div class="kpi"><div class="k-label">Highest risk lane</div>
+      <div class="k-value" style="color:${riskColor(worst.risk_score)}">${worst.risk_score}</div>
+      <div class="k-sub">${worst.label} · ${worst.band}</div></div>
+    <div class="kpi"><div class="k-label">Leanest cost-to-serve</div>
+      <div class="k-value">${eur(rec.total_eur)}</div>
+      <div class="k-sub">${rec.market} · per container</div></div>
+    <div class="kpi"><div class="k-label">Cost spread across lanes</div>
+      <div class="k-value">${eur(rec.spread_eur)}</div>
+      <div class="k-sub">leanest vs ${rec.priciest_market}</div></div>
+    <div class="kpi"><div class="k-label">Brent crude</div>
+      <div class="k-value">${brent != null ? "$" + brent : "–"}</div>
+      <div class="k-sub">drives bunker &amp; feedstock cost</div></div>`;
+}
+
 function render(state) {
   document.getElementById("subtitle").textContent =
     "Live FX · Brent · news  ·  " + new Date().toLocaleString();
   renderSummary(state);
+  renderKpis(state);
   renderScenarios(state);
   renderMap(state);
   renderReco(state);
