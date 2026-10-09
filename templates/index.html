@@ -367,6 +367,10 @@ const LANE_GEO = {
 const CAPE = [...ESP, [-12,28], [-18,15], [-16,2], [-6,-12], [6,-25], [15,-33], [19,-35], [28,-36], [42,-35]];
 LANE_GEO.AU.cape = [...CAPE, [62,-38], [90,-40], [115,-38], [133,-38], [145,-40], [150,-38], [151.2,-33.87]];
 LANE_GEO.CN.cape = [...CAPE, [60,-22], [80,-6], [93,2], [101,2.8], [104,2], [106,5], [110,10], [114,18], [119,24], [122,29], [121.5,31.2]];
+// Chokepoints the Cape paths physically pass: out of the Med via Gibraltar, and
+// China still threads Malacca. Suez + Bab-el-Mandeb are skipped together.
+LANE_GEO.AU.capeVia = ["Gibraltar"];
+LANE_GEO.CN.capeVia = ["Gibraltar", "Malacca"];
 
 // Colour a chokepoint marker by its 0-100 tension (calm green -> crisis red).
 function tensionColor(t) {
@@ -545,37 +549,45 @@ function tip() { return document.getElementById("tooltip"); }
 function showTip(html, e) { const t = tip(); t.innerHTML = html; t.style.opacity = 1; moveTip(e); }
 function moveTip(e) { const t = tip(); t.style.left = (e.clientX + 14) + "px"; t.style.top = (e.clientY + 14) + "px"; }
 function hideTip() { tip().style.opacity = 0; }
-// Which lane names transit a given chokepoint.
-function lanesThrough(name) {
-  return Object.values(LANE_GEO).filter(g => g.via.includes(name)).map(g => g.name);
+// The route each lane is ACTUALLY on under the current tensions: its normal
+// corridor, or the Cape diversion when a corridor chokepoint is too disrupted.
+// Clicks, tooltips and labels all read from this so they match the drawn line.
+function effectiveRoutes(state) {
+  const tension = {};
+  (state.scenarios && state.scenarios.chokepoints || []).forEach(c => tension[c.name] = c.tension);
+  const threshold = state.scenarios ? state.scenarios.reroute_threshold : 999;
+  const out = {};
+  state.lane_order.forEach(lane => {
+    const geo = LANE_GEO[lane];
+    const avoided = geo.via.filter(cp => (tension[cp] ?? 0) >= threshold);
+    const diverting = avoided.length > 0 && !!geo.cape;
+    out[lane] = {
+      diverting, avoided,
+      path: diverting ? geo.cape : geo.route,
+      via: diverting ? geo.capeVia : geo.via,
+    };
+  });
+  return out;
 }
 
 function renderMap(state) {
   const g = d3.select("#arcs");
   g.selectAll("*").remove();
   const legend = d3.select("#legend"); legend.html("");
-
-  // Tension lookup + reroute threshold for deciding Cape diversions.
-  const tension = {};
-  (state.scenarios && state.scenarios.chokepoints || []).forEach(c => tension[c.name] = c.tension);
-  const threshold = state.scenarios ? state.scenarios.reroute_threshold : 999;
+  const routes = effectiveRoutes(state);
 
   // 1. Lane routes (drawn first, under the chokepoint markers). When a
-  //    chokepoint is selected, lanes that DON'T use it are dimmed.
+  //    chokepoint is selected, lanes that DON'T pass it are dimmed.
   state.lane_order.forEach(lane => {
     const r = state.results[lane];
     const geo = LANE_GEO[lane];
-    // Diversion: if any corridor chokepoint is too disrupted to transit, draw
-    // the Cape route and relabel — matching the reroute premium in the cost.
-    const avoided = geo.via.filter(cp => (tension[cp] ?? 0) >= threshold);
-    const diverting = avoided.length > 0 && geo.cape;
-    const path = diverting ? geo.cape : geo.route;
+    const { diverting, avoided, path, via } = routes[lane];
     const viaTxt = diverting
-      ? `diverting via Cape of Good Hope (avoiding ${avoided.join(", ")})`
-      : (geo.via.length ? `via ${geo.via.join(", ")}` : "open ocean");
+      ? `via ${via[0]} → Cape of Good Hope${via.length > 1 ? " → " + via.slice(1).join(", ") : ""} (Red Sea avoided: ${avoided.join(", ")} disrupted)`
+      : (via.length ? `via ${via.join(", ")}` : "open ocean");
     const dest = path[path.length - 1];
-    const hot = selectedChoke && geo.via.includes(selectedChoke);
-    const dim = selectedChoke && !geo.via.includes(selectedChoke);
+    const hot = selectedChoke && via.includes(selectedChoke);
+    const dim = selectedChoke && !via.includes(selectedChoke);
     const col = riskColor(r.risk_score);
 
     g.append("path").attr("class", "arc" + (dim ? " dim" : "") + (hot ? " hot" : ""))
@@ -610,14 +622,18 @@ function renderMap(state) {
   //    click to highlight only the lanes that transit it (click again to clear).
   (state.scenarios && state.scenarios.chokepoints || []).forEach(cp => {
     const [x, y] = projection([cp.lon, cp.lat]);
-    const lanes = lanesThrough(cp.name);
+    const lanes = state.lane_order.filter(l => routes[l].via.includes(cp.name)).map(l => LANE_GEO[l].name);
+    const diverted = state.lane_order
+      .filter(l => routes[l].diverting && LANE_GEO[l].via.includes(cp.name))
+      .map(l => LANE_GEO[l].name);
     g.append("rect").attr("class", "choke" + (selectedChoke === cp.name ? " sel" : ""))
       .attr("x", x - 3.5).attr("y", y - 3.5).attr("width", 7).attr("height", 7)
       .attr("transform", `rotate(45 ${x} ${y})`)
       .attr("fill", tensionColor(cp.tension))
       .on("mousemove", e => showTip(
         `<b>${cp.name}</b> · tension ${cp.tension}/100<br>` +
-        `Lanes through here: ${lanes.join(", ") || "none of ours"}`, e))
+        `Lanes through here: ${lanes.join(", ") || "none of ours"}` +
+        (diverted.length ? `<br>Diverted around the Cape: ${diverted.join(", ")}` : ""), e))
       .on("mouseleave", hideTip)
       .on("click", () => { selectedChoke = selectedChoke === cp.name ? null : cp.name; renderMap(state); });
     g.append("text").attr("class", "choke-label")
