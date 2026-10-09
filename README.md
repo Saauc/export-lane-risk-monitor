@@ -89,10 +89,6 @@ The **scenario selector** recomputes everything live:
 - **Red Sea closure** → Australia & China exposure and reroute cost climb further; Atlantic lanes untouched.
 - **Hormuz crisis (oil)** → cost rises on *all seven* lanes via the feedstock/fuel channel.
 
-![Stress scenario — Red Sea closure](docs/stress-red-sea.png)
-
-<sub>Flipping to a "Red Sea closure" scenario recomputes every lane's risk and cost in place — the Asia-Pacific lanes redden and their reroute premium rises, while the Atlantic lanes are unaffected.</sub>
-
 ## Validation / backtest
 
 `backtest.py` replays the market history in the SQLite store and reconstructs the landed cost per lane for each past day — **on the same basis as the live cards** (baseline chokepoint tensions, so feedstock + reroute premiums are in both; this is why today's live number sits *inside* the reconstructed range rather than above it). It reports:
